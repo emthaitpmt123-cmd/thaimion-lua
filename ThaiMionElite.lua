@@ -9,18 +9,20 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
 local THEME = {
-	GlassMain = Color3.fromRGB(11, 17, 29),
-	GlassMainAlpha = 0.36,
-	GlassCard = Color3.fromRGB(20, 31, 50),
-	GlassCardAlpha = 0.36,
-	AccentCyan = Color3.fromRGB(0, 214, 255),
-	AccentBlue = Color3.fromRGB(64, 156, 255),
-	AccentGreen = Color3.fromRGB(46, 224, 152),
-	AccentRed = Color3.fromRGB(235, 78, 92),
-	StrokeSoft = Color3.fromRGB(125, 226, 255),
-	StrokeAlpha = 0.48,
-	TextBright = Color3.fromRGB(244, 249, 255),
-	TextMuted = Color3.fromRGB(196, 212, 234),
+	GlassMain = Color3.fromRGB(246, 250, 255),
+	GlassMainAlpha = 0.28,
+	GlassCard = Color3.fromRGB(255, 255, 255),
+	GlassCardAlpha = 0.34,
+	AccentCyan = Color3.fromRGB(0, 150, 225),
+	AccentBlue = Color3.fromRGB(24, 118, 232),
+	AccentGreen = Color3.fromRGB(16, 175, 112),
+	AccentRed = Color3.fromRGB(224, 62, 78),
+	StrokeSoft = Color3.fromRGB(255, 255, 255),
+	StrokeAccent = Color3.fromRGB(24, 118, 232),
+	StrokeAlpha = 0.18,
+	TextDark = Color3.fromRGB(16, 26, 44),
+	TextSub = Color3.fromRGB(54, 74, 104),
+	TextWhite = Color3.fromRGB(255, 255, 255),
 }
 
 local function getGuiParent()
@@ -63,7 +65,7 @@ end
 local function addStroke(inst, color, thickness, transparency)
 	local s = Instance.new("UIStroke")
 	s.Color = color or THEME.StrokeSoft
-	s.Thickness = thickness or 1.2
+	s.Thickness = thickness or 1.3
 	s.Transparency = transparency or THEME.StrokeAlpha
 	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	s.Parent = inst
@@ -185,16 +187,16 @@ StatsGui.Parent = PGui
 
 local TopStatsBar = Instance.new("Frame")
 TopStatsBar.Name = "TopStatsBar"
-TopStatsBar.Size = UDim2.new(0, 256, 0, 26)
-TopStatsBar.Position = UDim2.new(0, 220, 0, 10)
+TopStatsBar.Size = UDim2.new(0, 276, 0, 28)
+TopStatsBar.Position = UDim2.new(0, 210, 0, 10)
 TopStatsBar.BackgroundColor3 = THEME.GlassMain
-TopStatsBar.BackgroundTransparency = 0.28
+TopStatsBar.BackgroundTransparency = 0.24
 TopStatsBar.BorderSizePixel = 0
 TopStatsBar.Active = true
 TopStatsBar.Visible = false
 TopStatsBar.Parent = StatsGui
-addCorner(TopStatsBar, 8)
-addStroke(TopStatsBar, THEME.AccentCyan, 1.15, 0.35)
+addCorner(TopStatsBar, 9)
+addStroke(TopStatsBar, THEME.StrokeSoft, 1.35, 0.16)
 attachFreeDrag(TopStatsBar, TopStatsBar)
 
 local StatsLabel = Instance.new("TextLabel")
@@ -202,8 +204,8 @@ StatsLabel.Size = UDim2.new(1, -12, 1, 0)
 StatsLabel.Position = UDim2.new(0, 6, 0, 0)
 StatsLabel.BackgroundTransparency = 1
 StatsLabel.Text = "FPS: 60  |  Ping: 35ms  |  Mem: 512MB"
-StatsLabel.TextColor3 = THEME.TextBright
-StatsLabel.TextSize = 10.5
+StatsLabel.TextColor3 = THEME.TextDark
+StatsLabel.TextSize = 11
 StatsLabel.Font = Enum.Font.GothamBold
 StatsLabel.TextXAlignment = Enum.TextXAlignment.Center
 StatsLabel.TextTruncate = Enum.TextTruncate.AtEnd
@@ -211,47 +213,47 @@ StatsLabel.Parent = TopStatsBar
 
 local function showSuccessBanner(titleText, subText)
 	local banner = Instance.new("Frame")
-	banner.Size = UDim2.new(0, 310, 0, 52)
-	banner.Position = UDim2.new(0.5, -155, 0, -70)
+	banner.Size = UDim2.new(0, 324, 0, 56)
+	banner.Position = UDim2.new(0.5, -162, 0, -76)
 	banner.BackgroundColor3 = THEME.GlassMain
-	banner.BackgroundTransparency = 0.25
+	banner.BackgroundTransparency = 0.22
 	banner.BorderSizePixel = 0
 	banner.Parent = BannerGui
-	addCorner(banner, 12)
-	addStroke(banner, THEME.AccentGreen, 1.3, 0.25)
+	addCorner(banner, 13)
+	addStroke(banner, THEME.StrokeSoft, 1.4, 0.14)
 
 	local accentBar = Instance.new("Frame")
-	accentBar.Size = UDim2.new(0, 4, 0.68, 0)
-	accentBar.Position = UDim2.new(0, 10, 0.16, 0)
+	accentBar.Size = UDim2.new(0, 5, 0.68, 0)
+	accentBar.Position = UDim2.new(0, 11, 0.16, 0)
 	accentBar.BackgroundColor3 = THEME.AccentGreen
 	accentBar.BorderSizePixel = 0
 	accentBar.Parent = banner
 	addCorner(accentBar, 4)
 
 	local mainLbl = Instance.new("TextLabel")
-	mainLbl.Size = UDim2.new(1, -28, 0, 22)
-	mainLbl.Position = UDim2.new(0, 22, 0, 6)
+	mainLbl.Size = UDim2.new(1, -30, 0, 22)
+	mainLbl.Position = UDim2.new(0, 24, 0, 7)
 	mainLbl.BackgroundTransparency = 1
 	mainLbl.Text = titleText or "Loaded Successfully"
-	mainLbl.TextColor3 = THEME.TextBright
+	mainLbl.TextColor3 = THEME.TextDark
 	mainLbl.TextSize = 14
 	mainLbl.Font = Enum.Font.GothamBold
 	mainLbl.TextXAlignment = Enum.TextXAlignment.Left
 	mainLbl.Parent = banner
 
 	local subLbl = Instance.new("TextLabel")
-	subLbl.Size = UDim2.new(1, -28, 0, 16)
-	subLbl.Position = UDim2.new(0, 22, 0, 28)
+	subLbl.Size = UDim2.new(1, -30, 0, 16)
+	subLbl.Position = UDim2.new(0, 24, 0, 30)
 	subLbl.BackgroundTransparency = 1
 	subLbl.Text = subText or "THAIMION ELITE is ready"
-	subLbl.TextColor3 = THEME.TextMuted
-	subLbl.TextSize = 11
+	subLbl.TextColor3 = THEME.TextSub
+	subLbl.TextSize = 11.5
 	subLbl.Font = Enum.Font.GothamMedium
 	subLbl.TextXAlignment = Enum.TextXAlignment.Left
 	subLbl.Parent = banner
 
 	local slideIn = TweenService:Create(banner, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.5, -155, 0, 40)
+		Position = UDim2.new(0.5, -162, 0, 40)
 	})
 	slideIn:Play()
 	slideIn.Completed:Wait()
@@ -259,20 +261,20 @@ local function showSuccessBanner(titleText, subText)
 	task.wait(1.8)
 
 	local slideOut = TweenService:Create(banner, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
-		Position = UDim2.new(0.5, -155, 0, -70)
+		Position = UDim2.new(0.5, -162, 0, -76)
 	})
 	slideOut:Play()
 	slideOut.Completed:Wait()
 	banner:Destroy()
 end
 
-local FULL_SIZE = UDim2.new(0, 450, 0, 315)
-local MINI_SIZE = UDim2.new(0, 225, 0, 38)
+local FULL_SIZE = UDim2.new(0, 500, 0, 355)
+local MINI_SIZE = UDim2.new(0, 250, 0, 42)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = FULL_SIZE
-MainFrame.Position = UDim2.new(0, 140, 0, 52)
+MainFrame.Position = UDim2.new(0, 125, 0, 46)
 MainFrame.BackgroundColor3 = THEME.GlassMain
 MainFrame.BackgroundTransparency = THEME.GlassMainAlpha
 MainFrame.BorderSizePixel = 0
@@ -280,12 +282,12 @@ MainFrame.ClipsDescendants = true
 MainFrame.Active = true
 MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
-addCorner(MainFrame, 14)
-addStroke(MainFrame, THEME.StrokeSoft, 1.35, THEME.StrokeAlpha)
+addCorner(MainFrame, 16)
+addStroke(MainFrame, THEME.StrokeSoft, 1.5, THEME.StrokeAlpha)
 
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, -66, 0, 38)
+TopBar.Size = UDim2.new(1, -76, 0, 42)
 TopBar.Position = UDim2.new(0, 0, 0, 0)
 TopBar.BackgroundTransparency = 1
 TopBar.Active = true
@@ -293,45 +295,46 @@ TopBar.Parent = MainFrame
 attachFreeDrag(TopBar, MainFrame)
 
 local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, -12, 1, 0)
-TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+TitleLabel.Size = UDim2.new(1, -14, 1, 0)
+TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Text = "THAIMION ELITE"
-TitleLabel.TextColor3 = THEME.TextBright
-TitleLabel.TextSize = 13
+TitleLabel.TextColor3 = THEME.TextDark
+TitleLabel.TextSize = 14.5
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.TextTruncate = Enum.TextTruncate.AtEnd
 TitleLabel.Parent = TopBar
 
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 26, 0, 22)
-MinBtn.Position = UDim2.new(1, -62, 0, 8)
+MinBtn.Size = UDim2.new(0, 30, 0, 25)
+MinBtn.Position = UDim2.new(1, -70, 0, 8.5)
 MinBtn.BackgroundColor3 = THEME.GlassCard
-MinBtn.BackgroundTransparency = 0.3
+MinBtn.BackgroundTransparency = 0.25
 MinBtn.Text = "-"
-MinBtn.TextColor3 = THEME.TextBright
-MinBtn.TextSize = 14
+MinBtn.TextColor3 = THEME.TextDark
+MinBtn.TextSize = 15
 MinBtn.Font = Enum.Font.GothamBold
 MinBtn.Parent = MainFrame
-addCorner(MinBtn, 6)
-addStroke(MinBtn, THEME.StrokeSoft, 1, 0.5)
+addCorner(MinBtn, 8)
+addStroke(MinBtn, THEME.StrokeSoft, 1.2, 0.2)
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 26, 0, 22)
-CloseBtn.Position = UDim2.new(1, -32, 0, 8)
+CloseBtn.Size = UDim2.new(0, 30, 0, 25)
+CloseBtn.Position = UDim2.new(1, -36, 0, 8.5)
 CloseBtn.BackgroundColor3 = THEME.AccentRed
-CloseBtn.BackgroundTransparency = 0.25
+CloseBtn.BackgroundTransparency = 0.14
 CloseBtn.Text = "X"
-CloseBtn.TextColor3 = THEME.TextBright
-CloseBtn.TextSize = 12
+CloseBtn.TextColor3 = THEME.TextWhite
+CloseBtn.TextSize = 13
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = MainFrame
-addCorner(CloseBtn, 6)
+addCorner(CloseBtn, 8)
+addStroke(CloseBtn, THEME.StrokeSoft, 1, 0.3)
 
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -24, 0, 32)
-TabBar.Position = UDim2.new(0, 12, 0, 42)
+TabBar.Size = UDim2.new(1, -28, 0, 36)
+TabBar.Position = UDim2.new(0, 14, 0, 46)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = MainFrame
 
@@ -342,8 +345,8 @@ TabLayout.Padding = UDim.new(0, 10)
 TabLayout.Parent = TabBar
 
 local ContentArea = Instance.new("Frame")
-ContentArea.Size = UDim2.new(1, -24, 1, -84)
-ContentArea.Position = UDim2.new(0, 12, 0, 78)
+ContentArea.Size = UDim2.new(1, -28, 1, -94)
+ContentArea.Position = UDim2.new(0, 14, 0, 88)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
@@ -355,8 +358,8 @@ local function createPage(name)
 	page.Name = name .. "Page"
 	page.Size = UDim2.new(1, 0, 1, 0)
 	page.BackgroundTransparency = 1
-	page.ScrollBarThickness = 3
-	page.ScrollBarImageColor3 = THEME.AccentCyan
+	page.ScrollBarThickness = 4
+	page.ScrollBarImageColor3 = THEME.AccentBlue
 	page.CanvasSize = UDim2.new(0, 0, 0, 0)
 	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	page.ScrollingEnabled = true
@@ -364,7 +367,7 @@ local function createPage(name)
 	page.Parent = ContentArea
 
 	local list = Instance.new("UIListLayout")
-	list.Padding = UDim.new(0, 7)
+	list.Padding = UDim.new(0, 8)
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.Parent = page
 
@@ -376,17 +379,17 @@ local function createTabButton(name, order)
 	local btn = Instance.new("TextButton")
 	btn.Name = name .. "Tab"
 	btn.LayoutOrder = order
-	btn.Size = UDim2.new(0.31, 0, 1, 0)
+	btn.Size = UDim2.new(0.315, 0, 1, 0)
 	btn.BackgroundColor3 = THEME.GlassCard
 	btn.BackgroundTransparency = THEME.GlassCardAlpha
 	btn.Text = name
-	btn.TextColor3 = THEME.TextMuted
-	btn.TextSize = 12
+	btn.TextColor3 = THEME.TextDark
+	btn.TextSize = 12.5
 	btn.Font = Enum.Font.GothamBold
 	btn.Parent = TabBar
-	addCorner(btn, 8)
-	addStroke(btn, THEME.StrokeSoft, 1, 0.55)
-	tabButtons[name] = btn
+	addCorner(btn, 10)
+	local st = addStroke(btn, THEME.StrokeSoft, 1.2, 0.22)
+	tabButtons[name] = { button = btn, stroke = st }
 	return btn
 end
 
@@ -394,11 +397,15 @@ local function selectTab(name)
 	for k, p in pairs(pages) do
 		p.Visible = (k == name)
 	end
-	for k, b in pairs(tabButtons) do
+	for k, item in pairs(tabButtons) do
 		local active = (k == name)
-		b.BackgroundColor3 = active and THEME.AccentBlue or THEME.GlassCard
-		b.BackgroundTransparency = active and 0.22 or THEME.GlassCardAlpha
-		b.TextColor3 = active and THEME.TextBright or THEME.TextMuted
+		item.button.BackgroundColor3 = active and THEME.AccentBlue or THEME.GlassCard
+		item.button.BackgroundTransparency = active and 0.16 or THEME.GlassCardAlpha
+		item.button.TextColor3 = active and THEME.TextWhite or THEME.TextDark
+		if item.stroke then
+			item.stroke.Color = active and THEME.StrokeSoft or THEME.StrokeSoft
+			item.stroke.Transparency = active and 0.12 or 0.25
+		end
 	end
 end
 
@@ -413,21 +420,22 @@ end
 local function makeToggleRow(parent, labelPrefix, initialState, onToggle)
 	local state = initialState and true or false
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, 0, 0, 32)
+	btn.Size = UDim2.new(1, 0, 0, 36)
 	btn.BackgroundColor3 = state and THEME.AccentBlue or THEME.GlassCard
-	btn.BackgroundTransparency = state and 0.26 or THEME.GlassCardAlpha
-	btn.TextColor3 = state and THEME.TextBright or THEME.TextMuted
-	btn.TextSize = 12
+	btn.BackgroundTransparency = state and 0.16 or THEME.GlassCardAlpha
+	btn.TextColor3 = state and THEME.TextWhite or THEME.TextDark
+	btn.TextSize = 12.5
 	btn.Font = Enum.Font.GothamBold
 	btn.Parent = parent
-	addCorner(btn, 8)
-	addStroke(btn, THEME.StrokeSoft, 1, state and 0.25 or 0.5)
+	addCorner(btn, 10)
+	local st = addStroke(btn, state and THEME.StrokeSoft or THEME.StrokeSoft, 1.25, state and 0.12 or 0.24)
 
 	local function refresh()
-		btn.Text = labelPrefix .. ": " .. (state and "ON" or "OFF")
+		btn.Text = labelPrefix .. "   •   " .. (state and "ON" or "OFF")
 		btn.BackgroundColor3 = state and THEME.AccentBlue or THEME.GlassCard
-		btn.BackgroundTransparency = state and 0.26 or THEME.GlassCardAlpha
-		btn.TextColor3 = state and THEME.TextBright or THEME.TextMuted
+		btn.BackgroundTransparency = state and 0.16 or THEME.GlassCardAlpha
+		btn.TextColor3 = state and THEME.TextWhite or THEME.TextDark
+		st.Transparency = state and 0.12 or 0.24
 	end
 	refresh()
 
@@ -462,28 +470,28 @@ end
 local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, unitSuffix, onChanged)
 	local currentVal = math.clamp(defaultVal, minVal, maxVal)
 	local card = Instance.new("Frame")
-	card.Size = UDim2.new(1, 0, 0, 48)
+	card.Size = UDim2.new(1, 0, 0, 52)
 	card.BackgroundColor3 = THEME.GlassCard
 	card.BackgroundTransparency = THEME.GlassCardAlpha
 	card.Active = true
 	card.Parent = parent
-	addCorner(card, 8)
-	addStroke(card, THEME.StrokeSoft, 1, 0.52)
+	addCorner(card, 10)
+	addStroke(card, THEME.StrokeSoft, 1.2, 0.22)
 
 	local titleLbl = Instance.new("TextLabel")
-	titleLbl.Size = UDim2.new(1, -16, 0, 18)
-	titleLbl.Position = UDim2.new(0, 8, 0, 3)
+	titleLbl.Size = UDim2.new(1, -18, 0, 20)
+	titleLbl.Position = UDim2.new(0, 10, 0, 4)
 	titleLbl.BackgroundTransparency = 1
 	titleLbl.Text = titlePrefix .. ": " .. tostring(currentVal) .. (unitSuffix or "")
-	titleLbl.TextColor3 = THEME.TextBright
-	titleLbl.TextSize = 11
-	titleLbl.Font = Enum.Font.GothamMedium
+	titleLbl.TextColor3 = THEME.TextDark
+	titleLbl.TextSize = 11.5
+	titleLbl.Font = Enum.Font.GothamBold
 	titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 	titleLbl.Parent = card
 
 	local hitBox = Instance.new("TextButton")
-	hitBox.Size = UDim2.new(1, -16, 0, 28)
-	hitBox.Position = UDim2.new(0, 8, 0, 19)
+	hitBox.Size = UDim2.new(1, -18, 0, 28)
+	hitBox.Position = UDim2.new(0, 10, 0, 21)
 	hitBox.BackgroundTransparency = 1
 	hitBox.Text = ""
 	hitBox.AutoButtonColor = false
@@ -493,7 +501,7 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	local track = Instance.new("Frame")
 	track.Size = UDim2.new(1, 0, 0, 8)
 	track.Position = UDim2.new(0, 0, 0.5, -4)
-	track.BackgroundColor3 = THEME.GlassMain
+	track.BackgroundColor3 = Color3.fromRGB(214, 226, 244)
 	track.BackgroundTransparency = 0.25
 	track.Parent = hitBox
 	addCorner(track, 4)
@@ -506,13 +514,13 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	addCorner(fill, 4)
 
 	local knob = Instance.new("Frame")
-	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.Size = UDim2.new(0, 17, 0, 17)
 	knob.AnchorPoint = Vector2.new(0.5, 0.5)
 	knob.Position = UDim2.new(ratio, 0, 0.5, 0)
-	knob.BackgroundColor3 = THEME.TextBright
+	knob.BackgroundColor3 = THEME.TextWhite
 	knob.Parent = track
-	addCorner(knob, 8)
-	addStroke(knob, THEME.AccentCyan, 1.5, 0.1)
+	addCorner(knob, 9)
+	addStroke(knob, THEME.AccentBlue, 2, 0.1)
 
 	local activeInput = nil
 	local changedConn = nil
@@ -580,7 +588,7 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	end)
 end
 local speedEnabled = false
-local speedValue = 50
+local speedValue = 80
 local noclipEnabled = false
 local antiFallEnabled = false
 local aimHeadEnabled = false
@@ -594,7 +602,7 @@ local stickFrontEnabled = false
 local flingTargetEnabled = false
 
 local spamHeavyEnabled = false
-local pullRange = 55
+local pullRange = 75
 local pullOrbitEnabled = false
 
 local setters = {}
@@ -632,7 +640,7 @@ fovRingFrame.BackgroundTransparency = 1
 fovRingFrame.Visible = false
 fovRingFrame.Parent = TracerGui
 addCorner(fovRingFrame, 999)
-addStroke(fovRingFrame, THEME.AccentGreen, 1.6, 0.15)
+addStroke(fovRingFrame, THEME.AccentGreen, 1.8, 0.15)
 
 local FloatingTPGui = Instance.new("ScreenGui")
 FloatingTPGui.Name = "ThaiMionElite_TPFloatingGui"
@@ -680,21 +688,21 @@ end
 
 local QuickTPBtn = Instance.new("TextButton")
 QuickTPBtn.Name = "QuickTPButton"
-QuickTPBtn.Size = UDim2.new(0, 126, 0, 38)
+QuickTPBtn.Size = UDim2.new(0, 134, 0, 42)
 QuickTPBtn.Position = UDim2.new(0, 260, 0, 250)
-QuickTPBtn.BackgroundColor3 = THEME.AccentCyan
-QuickTPBtn.BackgroundTransparency = 0.15
+QuickTPBtn.BackgroundColor3 = THEME.GlassMain
+QuickTPBtn.BackgroundTransparency = 0.22
 QuickTPBtn.Text = "TP TM"
-QuickTPBtn.TextColor3 = THEME.TextBright
-QuickTPBtn.TextSize = 13
+QuickTPBtn.TextColor3 = THEME.TextDark
+QuickTPBtn.TextSize = 13.5
 QuickTPBtn.Font = Enum.Font.GothamBold
 QuickTPBtn.AutoButtonColor = false
 QuickTPBtn.Active = true
 QuickTPBtn.ZIndex = 25
 QuickTPBtn.Visible = false
 QuickTPBtn.Parent = FloatingTPGui
-addCorner(QuickTPBtn, 10)
-addStroke(QuickTPBtn, THEME.TextBright, 1.3, 0.25)
+addCorner(QuickTPBtn, 11)
+addStroke(QuickTPBtn, THEME.AccentCyan, 1.6, 0.15)
 attachFreeDrag(QuickTPBtn, QuickTPBtn, teleportAlongScreenCenter)
 
 local function getTargetHeadOrRoot(plr)
@@ -720,7 +728,7 @@ local _, setSpeed = makeToggleRow(pages.Main, "Speed", false, function(on)
 end)
 setters.speed = setSpeed
 
-makeSliderCard(pages.Main, "WalkSpeed Value", 16, 150, speedValue, "", function(v)
+makeSliderCard(pages.Main, "WalkSpeed Value", 16, 1000, speedValue, "", function(v)
 	speedValue = v
 	if speedEnabled then
 		local char = LocalPlayer.Character
@@ -775,19 +783,19 @@ end)
 setters.tpBtn = setTpBtn
 
 local playerListFrame = Instance.new("ScrollingFrame")
-playerListFrame.Size = UDim2.new(1, 0, 0, 112)
+playerListFrame.Size = UDim2.new(1, 0, 0, 120)
 playerListFrame.BackgroundColor3 = THEME.GlassCard
 playerListFrame.BackgroundTransparency = THEME.GlassCardAlpha
-playerListFrame.ScrollBarThickness = 3
-playerListFrame.ScrollBarImageColor3 = THEME.AccentCyan
+playerListFrame.ScrollBarThickness = 4
+playerListFrame.ScrollBarImageColor3 = THEME.AccentBlue
 playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 playerListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 playerListFrame.Parent = pages.Teleport
-addCorner(playerListFrame, 8)
-addStroke(playerListFrame, THEME.StrokeSoft, 1, 0.5)
+addCorner(playerListFrame, 10)
+addStroke(playerListFrame, THEME.StrokeSoft, 1.2, 0.22)
 
 local playerListLayout = Instance.new("UIListLayout")
-playerListLayout.Padding = UDim.new(0, 4)
+playerListLayout.Padding = UDim.new(0, 5)
 playerListLayout.Parent = playerListFrame
 
 local playerRowButtons = {}
@@ -797,8 +805,9 @@ local function updatePlayerRowVisuals()
 		if plr and plr.Parent and row and row.Parent then
 			local isSel = (selectedTarget == plr)
 			row.BackgroundColor3 = isSel and THEME.AccentGreen or THEME.GlassMain
-			row.BackgroundTransparency = isSel and 0.25 or 0.35
-			row.Text = (isSel and "[x] " or "[ ] ") .. plr.Name
+			row.BackgroundTransparency = isSel and 0.16 or 0.3
+			row.TextColor3 = isSel and THEME.TextWhite or THEME.TextDark
+			row.Text = (isSel and "✓ " or "• ") .. plr.Name
 		end
 	end
 end
@@ -814,17 +823,18 @@ local function rebuildPlayerList()
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer then
 			local row = Instance.new("TextButton")
-			row.Size = UDim2.new(1, -6, 0, 26)
+			row.Size = UDim2.new(1, -6, 0, 28)
 			row.BackgroundColor3 = THEME.GlassMain
-			row.BackgroundTransparency = 0.35
-			row.Text = "[ ] " .. plr.Name
-			row.TextColor3 = THEME.TextBright
-			row.TextSize = 11
-			row.Font = Enum.Font.GothamMedium
+			row.BackgroundTransparency = 0.3
+			row.Text = "• " .. plr.Name
+			row.TextColor3 = THEME.TextDark
+			row.TextSize = 11.5
+			row.Font = Enum.Font.GothamBold
 			row.TextXAlignment = Enum.TextXAlignment.Left
 			row.Active = true
 			row.Parent = playerListFrame
-			addCorner(row, 6)
+			addCorner(row, 8)
+			addStroke(row, THEME.StrokeSoft, 1, 0.25)
 
 			row.MouseButton1Click:Connect(function()
 				selectedTarget = plr
@@ -861,7 +871,7 @@ local _, setSpam = makeToggleRow(pages["Lag Tool TM"], "Spam Heavy Remz", false,
 end)
 setters.spam = setSpam
 
-makeSliderCard(pages["Lag Tool TM"], "Pull Range", 10, 200, pullRange, " studs", function(v)
+makeSliderCard(pages["Lag Tool TM"], "Pull Range", 15, 250, pullRange, " studs", function(v)
 	pullRange = v
 end)
 
@@ -871,16 +881,16 @@ end)
 setters.orbit = setOrbit
 
 local resetBtn = Instance.new("TextButton")
-resetBtn.Size = UDim2.new(1, 0, 0, 32)
+resetBtn.Size = UDim2.new(1, 0, 0, 36)
 resetBtn.BackgroundColor3 = THEME.GlassCard
 resetBtn.BackgroundTransparency = THEME.GlassCardAlpha
-resetBtn.Text = "Restore / Reset State"
-resetBtn.TextColor3 = THEME.AccentCyan
-resetBtn.TextSize = 12
+resetBtn.Text = "Restore / Reset All"
+resetBtn.TextColor3 = THEME.AccentRed
+resetBtn.TextSize = 12.5
 resetBtn.Font = Enum.Font.GothamBold
 resetBtn.Parent = pages["Lag Tool TM"]
-addCorner(resetBtn, 8)
-addStroke(resetBtn, THEME.AccentCyan, 1, 0.45)
+addCorner(resetBtn, 10)
+addStroke(resetBtn, THEME.StrokeSoft, 1.2, 0.22)
 
 resetBtn.Activated:Connect(function()
 	for _, fn in pairs(setters) do
@@ -952,7 +962,7 @@ local function refreshPropCache(char)
 		if obj:IsA("BasePart") and not obj.Anchored and not obj:IsDescendantOf(char) then
 			if not isPartInAnyCharacter(obj) then
 				table.insert(list, obj)
-				if #list >= 140 then
+				if #list >= 260 then
 					break
 				end
 			end
@@ -963,7 +973,11 @@ end
 
 local function refreshSpamRemotes()
 	local list = {}
-	local keywords = { "heavy", "remz", "skill", "atk", "attack", "hit", "damage", "swing", "punch", "shoot", "fire", "use" }
+	local keywords = {
+		"heavy", "remz", "skill", "atk", "attack", "hit", "damage",
+		"swing", "punch", "shoot", "fire", "use", "item", "tool",
+		"drop", "spawn", "throw", "equip", "action", "ability", "cast"
+	}
 	for _, desc in ipairs(game:GetDescendants()) do
 		if desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction") then
 			local lowerName = string.lower(desc.Name)
@@ -973,7 +987,7 @@ local function refreshSpamRemotes()
 					break
 				end
 			end
-			if #list >= 40 then
+			if #list >= 65 then
 				break
 			end
 		end
@@ -1072,12 +1086,12 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 
 	if pullOrbitEnabled and root and char then
-		if now - lastPropScan >= 0.45 then
+		if now - lastPropScan >= 0.3 then
 			lastPropScan = now
 			refreshPropCache(char)
 		end
 
-		orbitAngle += dt * 4.5
+		orbitAngle += dt * 6.0
 		local handled = 0
 		for i = #cachedProps, 1, -1 do
 			local obj = cachedProps[i]
@@ -1089,11 +1103,19 @@ RunService.Heartbeat:Connect(function(dt)
 					pcall(function()
 						obj:SetNetworkOwner(LocalPlayer)
 					end)
-					local offset = Vector3.new(math.cos(orbitAngle) * 8, 2.5, math.sin(orbitAngle) * 8)
-					obj.AssemblyLinearVelocity = ((root.Position + offset) - obj.Position) * 12
+					local ringRadius = 6.5 + ((handled % 4) * 3.2)
+					local heightOffset = 1.5 + ((handled % 5) * 1.8)
+					local theta = orbitAngle + (handled * 0.55)
+					local desiredPos = root.Position + Vector3.new(
+						math.cos(theta) * ringRadius,
+						heightOffset,
+						math.sin(theta) * ringRadius
+					)
+					obj.AssemblyLinearVelocity = (desiredPos - obj.Position) * 15
+					obj.AssemblyAngularVelocity = Vector3.new(18, 28, 18)
 					handled += 1
 				end
-				if handled >= 45 then
+				if handled >= 160 then
 					break
 				end
 			end
@@ -1101,13 +1123,22 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 
 	if spamHeavyEnabled then
-		if now - lastRemoteScan >= 2.0 then
+		if now - lastRemoteScan >= 1.5 then
 			lastRemoteScan = now
 			refreshSpamRemotes()
 		end
 		spamPulseTimer += dt
-		if spamPulseTimer >= 0.08 then
+		if spamPulseTimer >= 0.06 then
 			spamPulseTimer = 0
+			if char then
+				for _, child in ipairs(char:GetChildren()) do
+					if child:IsA("Tool") then
+						pcall(function()
+							child:Activate()
+						end)
+					end
+				end
+			end
 			for _, remote in ipairs(cachedRemotes) do
 				if remote and remote.Parent then
 					if remote:IsA("RemoteEvent") then
@@ -1231,50 +1262,50 @@ selectTab("Main")
 
 local LoaderOverlay = Instance.new("Frame")
 LoaderOverlay.Name = "LoaderOverlay"
-LoaderOverlay.Size = UDim2.new(0, 320, 0, 96)
-LoaderOverlay.Position = UDim2.new(0.5, -160, 0.5, -48)
+LoaderOverlay.Size = UDim2.new(0, 330, 0, 100)
+LoaderOverlay.Position = UDim2.new(0.5, -165, 0.5, -50)
 LoaderOverlay.BackgroundColor3 = THEME.GlassMain
-LoaderOverlay.BackgroundTransparency = 0.25
+LoaderOverlay.BackgroundTransparency = 0.22
 LoaderOverlay.BorderSizePixel = 0
 LoaderOverlay.Parent = ScreenGui
-addCorner(LoaderOverlay, 12)
-addStroke(LoaderOverlay, THEME.StrokeSoft, 1.3, 0.35)
+addCorner(LoaderOverlay, 14)
+addStroke(LoaderOverlay, THEME.StrokeSoft, 1.4, 0.16)
 
 local LoaderTitle = Instance.new("TextLabel")
 LoaderTitle.Size = UDim2.new(1, -24, 0, 22)
-LoaderTitle.Position = UDim2.new(0, 12, 0, 10)
+LoaderTitle.Position = UDim2.new(0, 12, 0, 12)
 LoaderTitle.BackgroundTransparency = 1
 LoaderTitle.Text = "Loading THAIMION ELITE..."
-LoaderTitle.TextColor3 = THEME.TextBright
-LoaderTitle.TextSize = 13
+LoaderTitle.TextColor3 = THEME.TextDark
+LoaderTitle.TextSize = 13.5
 LoaderTitle.Font = Enum.Font.GothamBold
 LoaderTitle.TextXAlignment = Enum.TextXAlignment.Left
 LoaderTitle.Parent = LoaderOverlay
 
 local PercentText = Instance.new("TextLabel")
-PercentText.Size = UDim2.new(0, 56, 0, 22)
-PercentText.Position = UDim2.new(1, -68, 0, 10)
+PercentText.Size = UDim2.new(0, 58, 0, 22)
+PercentText.Position = UDim2.new(1, -70, 0, 12)
 PercentText.BackgroundTransparency = 1
 PercentText.Text = "0%"
-PercentText.TextColor3 = THEME.AccentCyan
-PercentText.TextSize = 13
+PercentText.TextColor3 = THEME.AccentBlue
+PercentText.TextSize = 13.5
 PercentText.Font = Enum.Font.GothamBold
 PercentText.TextXAlignment = Enum.TextXAlignment.Right
 PercentText.Parent = LoaderOverlay
 
 local BarBg = Instance.new("Frame")
-BarBg.Size = UDim2.new(1, -24, 0, 10)
-BarBg.Position = UDim2.new(0, 12, 0, 52)
-BarBg.BackgroundColor3 = THEME.GlassCard
-BarBg.BackgroundTransparency = 0.3
+BarBg.Size = UDim2.new(1, -24, 0, 11)
+BarBg.Position = UDim2.new(0, 12, 0, 56)
+BarBg.BackgroundColor3 = Color3.fromRGB(214, 226, 244)
+BarBg.BackgroundTransparency = 0.25
 BarBg.Parent = LoaderOverlay
-addCorner(BarBg, 5)
+addCorner(BarBg, 6)
 
 local BarFill = Instance.new("Frame")
 BarFill.Size = UDim2.new(0, 0, 1, 0)
-BarFill.BackgroundColor3 = THEME.AccentCyan
+BarFill.BackgroundColor3 = THEME.AccentBlue
 BarFill.Parent = BarBg
-addCorner(BarFill, 5)
+addCorner(BarFill, 6)
 
 task.spawn(function()
 	local tween = TweenService:Create(
