@@ -3,10 +3,10 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local Stats = game:GetService("Stats")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
 local THEME = {
 	GlassMain = Color3.fromRGB(11, 17, 29),
@@ -38,7 +38,7 @@ if not PGui then
 	return
 end
 
-for _, name in ipairs({ "ThaiMionElite_LiquidGlass", "ThaiMionElite_BannerGui", "ThaiMionElite_TPFloatingGui" }) do
+for _, name in ipairs({ "ThaiMionElite_LiquidGlass", "ThaiMionElite_BannerGui", "ThaiMionElite_TPFloatingGui", "ThaiMionElite_StatsGui" }) do
 	local old = PGui:FindFirstChild(name)
 	if old then
 		pcall(function()
@@ -64,43 +64,31 @@ local function addStroke(inst, color, thickness, transparency)
 	return s
 end
 
-local function isTouchOrClickStart(input)
-	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType.Touch == Enum.UserInputType.Touch
+local function isPointerDown(input)
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
 end
 
-local function isTouchOrClickMove(input)
-	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch == Enum.UserInputType.Touch
+local function isPointerMove(input)
+	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch
 end
 
 local function makeDraggable(dragHandle, targetFrame)
 	local dragging = false
-	local dragInput = nil
+	local activeInput = nil
 	local dragStart = nil
 	local startPos = nil
 
 	dragHandle.InputBegan:Connect(function(input)
-		if isTouchOrClickStart(input) then
+		if isPointerDown(input) and not dragging then
 			dragging = true
+			activeInput = input
 			dragStart = input.Position
 			startPos = targetFrame.Position
-			dragInput = input
-
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
-			end)
-		end
-	end)
-
-	dragHandle.InputChanged:Connect(function(input)
-		if isTouchOrClickMove(input) then
-			dragInput = input
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input == dragInput and isTouchOrClickMove(input) then
+		if dragging and input == activeInput and isPointerMove(input) then
 			local delta = input.Position - dragStart
 			targetFrame.Position = UDim2.new(
 				startPos.X.Scale,
@@ -108,6 +96,13 @@ local function makeDraggable(dragHandle, targetFrame)
 				startPos.Y.Scale,
 				startPos.Y.Offset + delta.Y
 			)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if dragging and input == activeInput then
+			dragging = false
+			activeInput = nil
 		end
 	end)
 end
@@ -123,6 +118,40 @@ BannerGui.ResetOnSpawn = false
 BannerGui.DisplayOrder = 50
 BannerGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 BannerGui.Parent = PGui
+
+local StatsGui = Instance.new("ScreenGui")
+StatsGui.Name = "ThaiMionElite_StatsGui"
+StatsGui.ResetOnSpawn = false
+StatsGui.DisplayOrder = 45
+StatsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+StatsGui.Parent = PGui
+
+-- Compact movable top bar showing FPS | CPU | Ping (appears once menu loads)
+local TopStatsBar = Instance.new("Frame")
+TopStatsBar.Name = "TopStatsBar"
+TopStatsBar.Size = UDim2.new(0, 248, 0, 26)
+TopStatsBar.Position = UDim2.new(0.5, -124, 0, 8)
+TopStatsBar.BackgroundColor3 = THEME.GlassMain
+TopStatsBar.BackgroundTransparency = 0.28
+TopStatsBar.BorderSizePixel = 0
+TopStatsBar.Active = true
+TopStatsBar.Visible = false
+TopStatsBar.Parent = StatsGui
+addCorner(TopStatsBar, 8)
+addStroke(TopStatsBar, THEME.AccentCyan, 1.15, 0.35)
+makeDraggable(TopStatsBar, TopStatsBar)
+
+local StatsLabel = Instance.new("TextLabel")
+StatsLabel.Size = UDim2.new(1, -12, 1, 0)
+StatsLabel.Position = UDim2.new(0, 6, 0, 0)
+StatsLabel.BackgroundTransparency = 1
+StatsLabel.Text = "FPS: 60  |  CPU: 12%  |  Ping: 35ms"
+StatsLabel.TextColor3 = THEME.TextBright
+StatsLabel.TextSize = 10.5
+StatsLabel.Font = Enum.Font.GothamBold
+StatsLabel.TextXAlignment = Enum.TextXAlignment.Center
+StatsLabel.TextTruncate = Enum.TextTruncate.AtEnd
+StatsLabel.Parent = TopStatsBar
 
 local function showSuccessBanner(titleText, subText)
 	local banner = Instance.new("Frame")
@@ -166,7 +195,7 @@ local function showSuccessBanner(titleText, subText)
 	subLbl.Parent = banner
 
 	local slideIn = TweenService:Create(banner, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.5, -155, 0, 14)
+		Position = UDim2.new(0.5, -155, 0, 40)
 	})
 	slideIn:Play()
 	slideIn.Completed:Wait()
@@ -192,6 +221,7 @@ MainFrame.BackgroundColor3 = THEME.GlassMain
 MainFrame.BackgroundTransparency = THEME.GlassMainAlpha
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
+MainFrame.Active = true
 MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
 addCorner(MainFrame, 14)
@@ -209,6 +239,7 @@ local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 38)
 TopBar.BackgroundTransparency = 1
+TopBar.Active = true
 TopBar.Parent = MainFrame
 makeDraggable(TopBar, MainFrame)
 
@@ -279,6 +310,7 @@ local function createPage(name)
 	page.ScrollBarImageColor3 = THEME.AccentCyan
 	page.CanvasSize = UDim2.new(0, 0, 0, 0)
 	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	page.ScrollingEnabled = true
 	page.Visible = false
 	page.Parent = ContentArea
 
@@ -367,12 +399,24 @@ local function makeToggleRow(parent, labelPrefix, initialState, onToggle)
 	end
 end
 
+local function getParentScrollPage(inst)
+	local cur = inst.Parent
+	while cur do
+		if cur:IsA("ScrollingFrame") then
+			return cur
+		end
+		cur = cur.Parent
+	end
+	return nil
+end
+
 local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, unitSuffix, onChanged)
 	local currentVal = math.clamp(defaultVal, minVal, maxVal)
 	local card = Instance.new("Frame")
-	card.Size = UDim2.new(1, 0, 0, 44)
+	card.Size = UDim2.new(1, 0, 0, 48)
 	card.BackgroundColor3 = THEME.GlassCard
 	card.BackgroundTransparency = THEME.GlassCardAlpha
+	card.Active = true
 	card.Parent = parent
 	addCorner(card, 8)
 	addStroke(card, THEME.StrokeSoft, 1, 0.52)
@@ -388,12 +432,22 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 	titleLbl.Parent = card
 
+	-- Generous touch hit-box over the slider track so mobile fingers catch it easily
+	local hitBox = Instance.new("TextButton")
+	hitBox.Size = UDim2.new(1, -16, 0, 24)
+	hitBox.Position = UDim2.new(0, 8, 0, 21)
+	hitBox.BackgroundTransparency = 1
+	hitBox.Text = ""
+	hitBox.AutoButtonColor = false
+	hitBox.Active = true
+	hitBox.Parent = card
+
 	local track = Instance.new("Frame")
-	track.Size = UDim2.new(1, -16, 0, 8)
-	track.Position = UDim2.new(0, 8, 0, 27)
+	track.Size = UDim2.new(1, 0, 0, 8)
+	track.Position = UDim2.new(0, 0, 0.5, -4)
 	track.BackgroundColor3 = THEME.GlassMain
 	track.BackgroundTransparency = 0.25
-	track.Parent = card
+	track.Parent = hitBox
 	addCorner(track, 4)
 
 	local ratio = (currentVal - minVal) / math.max(1, (maxVal - minVal))
@@ -403,39 +457,71 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	fill.Parent = track
 	addCorner(fill, 4)
 
-	local sliding = false
-	local activeTouchInput = nil
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Position = UDim2.new(ratio, 0, 0.5, 0)
+	knob.BackgroundColor3 = THEME.TextBright
+	knob.Parent = track
+	addCorner(knob, 7)
+	addStroke(knob, THEME.AccentCyan, 1.5, 0.1)
 
-	local function updateFromX(posX)
-		local r = math.clamp((posX - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-		currentVal = math.floor(minVal + r * (maxVal - minVal) + 0.5)
-		fill.Size = UDim2.new((currentVal - minVal) / math.max(1, (maxVal - minVal)), 0, 1, 0)
-		titleLbl.Text = titlePrefix .. ": " .. tostring(currentVal) .. (unitSuffix or "")
-		if onChanged then
-			onChanged(currentVal)
+	local sliding = false
+	local activeSliderInput = nil
+	local parentScroll = getParentScrollPage(card)
+
+	local function applyPosX(posX)
+		local absPos = track.AbsolutePosition.X
+		local absSize = math.max(1, track.AbsoluteSize.X)
+		local r = math.clamp((posX - absPos) / absSize, 0, 1)
+		local nextVal = math.floor(minVal + r * (maxVal - minVal) + 0.5)
+		local newRatio = (nextVal - minVal) / math.max(1, (maxVal - minVal))
+		fill.Size = UDim2.new(newRatio, 0, 1, 0)
+		knob.Position = UDim2.new(newRatio, 0, 0.5, 0)
+		titleLbl.Text = titlePrefix .. ": " .. tostring(nextVal) .. (unitSuffix or "")
+		if nextVal ~= currentVal then
+			currentVal = nextVal
+			if onChanged then
+				onChanged(currentVal)
+			end
 		end
 	end
 
-	track.InputBegan:Connect(function(input)
-		if isTouchOrClickStart(input) then
+	local function beginSlide(input)
+		if isPointerDown(input) and not sliding then
 			sliding = true
-			activeTouchInput = input
-			updateFromX(input.Position.X)
+			activeSliderInput = input
+			if parentScroll then
+				parentScroll.ScrollingEnabled = false
+			end
+			applyPosX(input.Position.X)
 		end
-	end)
+	end
+
+	local function endSlide(input)
+		if sliding and (input == nil or input == activeSliderInput) then
+			sliding = false
+			activeSliderInput = nil
+			if parentScroll then
+				parentScroll.ScrollingEnabled = true
+			end
+		end
+	end
+
+	hitBox.InputBegan:Connect(beginSlide)
+	track.InputBegan:Connect(beginSlide)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if sliding and isTouchOrClickMove(input) then
-			if activeTouchInput == nil or input == activeTouchInput or input.UserInputType == Enum.UserInputType.MouseMovement then
-				updateFromX(input.Position.X)
+		if sliding and isPointerMove(input) then
+			if activeSliderInput == nil or input == activeSliderInput or input.UserInputType == Enum.UserInputType.MouseMovement then
+				applyPosX(input.Position.X)
 			end
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
-		if isTouchOrClickStart(input) and (input == activeTouchInput or input.UserInputType == Enum.UserInputType.MouseButton1) then
-			sliding = false
-			activeTouchInput = nil
+		if sliding and (input == activeSliderInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			endSlide(input)
 		end
 	end)
 end
@@ -444,6 +530,7 @@ local speedValue = 50
 local noclipEnabled = false
 local antiFallEnabled = false
 local aimHeadEnabled = false
+local aimTracerEnabled = true
 local aimFov = 140
 local wallbangEnabled = false
 local espEnabled = false
@@ -477,16 +564,34 @@ local function clearAllEsp()
 	end
 end
 
+-- FOV Circle + Aim Positioning Tracer Lines (inspired by green targeting lines)
 local fovCircle = Drawing and Drawing.new("Circle") or nil
 if fovCircle then
-	fovCircle.Thickness = 1.5
-	fovCircle.NumSides = 48
+	fovCircle.Thickness = 1.6
+	fovCircle.NumSides = 56
 	fovCircle.Filled = false
 	fovCircle.Visible = false
-	fovCircle.Color = THEME.AccentCyan
+	fovCircle.Color = THEME.AccentGreen
 end
 
--- Floating TP Aim button: teleports to where the screen center crosshair/aim points
+local tracerLines = {}
+if Drawing then
+	for i = 1, 6 do
+		local ln = Drawing.new("Line")
+		ln.Thickness = 1.4
+		ln.Transparency = 0.88
+		ln.Visible = false
+		ln.Color = THEME.AccentGreen
+		tracerLines[i] = ln
+	end
+end
+
+local function hideTracerLines()
+	for _, ln in ipairs(tracerLines) do
+		ln.Visible = false
+	end
+end
+
 local FloatingTPGui = Instance.new("ScreenGui")
 FloatingTPGui.Name = "ThaiMionElite_TPFloatingGui"
 FloatingTPGui.ResetOnSpawn = false
@@ -595,8 +700,19 @@ local _, setAimHead = makeToggleRow(pages.Main, "Aim Head (FOV)", false, functio
 	if fovCircle then
 		fovCircle.Visible = on
 	end
+	if not on then
+		hideTracerLines()
+	end
 end)
 setters.aimHead = setAimHead
+
+local _, setAimTracer = makeToggleRow(pages.Main, "Aim Tracer Lines", true, function(on)
+	aimTracerEnabled = on
+	if not on then
+		hideTracerLines()
+	end
+end)
+setters.aimTracer = setAimTracer
 
 makeSliderCard(pages.Main, "Aim FOV Radius", 40, 350, aimFov, " px", function(v)
 	aimFov = v
@@ -725,6 +841,7 @@ resetBtn.MouseButton1Click:Connect(function()
 	for _, fn in pairs(setters) do
 		fn(false)
 	end
+	hideTracerLines()
 	local char = LocalPlayer.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if hum then
@@ -733,9 +850,10 @@ resetBtn.MouseButton1Click:Connect(function()
 end)
 local function getBestTargetInFov()
 	local cam = Workspace.CurrentCamera
-	if not cam then return nil end
+	if not cam then return nil, nil end
 	local center = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
 	local bestHead = nil
+	local bestScreenPt = nil
 	local bestDist = aimFov
 
 	for _, plr in ipairs(Players:GetPlayers()) do
@@ -745,7 +863,8 @@ local function getBestTargetInFov()
 			if head and hum and hum.Health > 0 then
 				local screenPos, onScreen = cam:WorldToViewportPoint(head.Position)
 				if onScreen and screenPos.Z > 0 then
-					local d = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+					local pt = Vector2.new(screenPos.X, screenPos.Y)
+					local d = (pt - center).Magnitude
 					if d <= bestDist then
 						if not wallbangEnabled then
 							local params = RaycastParams.new()
@@ -758,12 +877,52 @@ local function getBestTargetInFov()
 						end
 						bestDist = d
 						bestHead = head
+						bestScreenPt = pt
 					end
 				end
 			end
 		end
 	end
-	return bestHead
+	return bestHead, bestScreenPt
+end
+
+local function updateAimTracers(cam, center, lockedPt)
+	if not Drawing or #tracerLines == 0 then
+		return
+	end
+	if not aimHeadEnabled or not aimTracerEnabled or not lockedPt then
+		hideTracerLines()
+		return
+	end
+
+	-- Ray-style positioning lines radiating from screen center & perimeter toward locked target head
+	local topAnchor = Vector2.new(cam.ViewportSize.X * 0.5, 0)
+	local bottomAnchor = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y)
+	local leftAnchor = Vector2.new(0, cam.ViewportSize.Y * 0.5)
+	local rightAnchor = Vector2.new(cam.ViewportSize.X, cam.ViewportSize.Y * 0.5)
+	local upperLeft = Vector2.new(cam.ViewportSize.X * 0.2, 0)
+	local upperRight = Vector2.new(cam.ViewportSize.X * 0.8, 0)
+
+	local pairsList = {
+		{ center, lockedPt },
+		{ topAnchor, lockedPt },
+		{ bottomAnchor, lockedPt },
+		{ leftAnchor, lockedPt },
+		{ rightAnchor, lockedPt },
+		{ upperLeft, lockedPt },
+	}
+
+	for idx, ln in ipairs(tracerLines) do
+		local pair = pairsList[idx]
+		if pair then
+			ln.From = pair[1]
+			ln.To = pair[2]
+			ln.Color = (idx == 1) and THEME.AccentCyan or THEME.AccentGreen
+			ln.Visible = true
+		else
+			ln.Visible = false
+		end
+	end
 end
 
 local cachedProps = {}
@@ -772,6 +931,8 @@ local lastRemoteScan = 0
 local cachedRemotes = {}
 local spamPulseTimer = 0
 local orbitAngle = 0
+local fpsCounter = 0
+local fpsTimer = 0
 
 local function isPartInAnyCharacter(part)
 	for _, plr in ipairs(Players:GetPlayers()) do
@@ -815,6 +976,25 @@ local function refreshSpamRemotes()
 		end
 	end
 	cachedRemotes = list
+end
+
+local function getPingMs()
+	local pingVal = 0
+	pcall(function()
+		local net = Stats and Stats:FindFirstChild("Network")
+		local item = net and net:FindFirstChild("ServerStatsItem") and net.ServerStatsItem:FindFirstChild("Data Ping")
+		if item then
+			pingVal = math.floor(item:GetValue() + 0.5)
+		end
+	end)
+	return pingVal
+end
+
+local function getCpuEstimatePercent(fpsNow)
+	-- Frame-time based CPU load estimate for client display
+	local frameMs = (fpsNow > 0) and (1000 / fpsNow) or 16.6
+	local pct = math.clamp(math.floor(((frameMs - 4) / 28) * 100), 5, 99)
+	return pct
 end
 
 RunService.Stepped:Connect(function()
@@ -924,19 +1104,35 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
+	fpsCounter += 1
+	fpsTimer += dt
+	if fpsTimer >= 0.5 then
+		local fpsNow = math.max(1, math.floor(fpsCounter / fpsTimer + 0.5))
+		local cpuNow = getCpuEstimatePercent(fpsNow)
+		local pingNow = getPingMs()
+		StatsLabel.Text = string.format("FPS: %d  |  CPU: %d%%  |  Ping: %dms", fpsNow, cpuNow, pingNow)
+		fpsCounter = 0
+		fpsTimer = 0
+	end
+
 	local cam = Workspace.CurrentCamera
+	local center = cam and Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5) or Vector2.zero
+
 	if fovCircle and cam then
 		fovCircle.Visible = aimHeadEnabled
 		fovCircle.Radius = aimFov
-		fovCircle.Position = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
+		fovCircle.Position = center
 	end
 
 	if aimHeadEnabled and cam then
-		local head = getBestTargetInFov()
+		local head, lockedPt = getBestTargetInFov()
 		if head then
 			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, head.Position)
 		end
+		updateAimTracers(cam, center, lockedPt)
+	else
+		hideTracerLines()
 	end
 
 	if espEnabled then
@@ -1001,11 +1197,18 @@ end)
 
 CloseBtn.MouseButton1Click:Connect(function()
 	clearAllEsp()
+	hideTracerLines()
 	if fovCircle then
 		pcall(function() fovCircle:Remove() end)
 	end
+	for _, ln in ipairs(tracerLines) do
+		pcall(function() ln:Remove() end)
+	end
 	if FloatingTPGui then
 		pcall(function() FloatingTPGui:Destroy() end)
+	end
+	if StatsGui then
+		pcall(function() StatsGui:Destroy() end)
 	end
 	ScreenGui:Destroy()
 end)
@@ -1084,6 +1287,7 @@ task.spawn(function()
 
 	LoaderOverlay:Destroy()
 	MainFrame.Visible = true
+	TopStatsBar.Visible = true
 	task.wait(0.1)
 	showSuccessBanner("Loaded Successfully", "THAIMION ELITE is ready")
 end)
