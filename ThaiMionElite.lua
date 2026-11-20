@@ -65,11 +65,11 @@ local function addStroke(inst, color, thickness, transparency)
 end
 
 local function isTouchOrClickStart(input)
-	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType.Touch == Enum.UserInputType.Touch
 end
 
 local function isTouchOrClickMove(input)
-	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch
+	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch == Enum.UserInputType.Touch
 end
 
 local function makeDraggable(dragHandle, targetFrame)
@@ -486,6 +486,7 @@ if fovCircle then
 	fovCircle.Color = THEME.AccentCyan
 end
 
+-- Floating TP Aim button: teleports to where the screen center crosshair/aim points
 local FloatingTPGui = Instance.new("ScreenGui")
 FloatingTPGui.Name = "ThaiMionElite_TPFloatingGui"
 FloatingTPGui.ResetOnSpawn = false
@@ -497,30 +498,66 @@ QuickTPBtn.Size = UDim2.new(0, 126, 0, 38)
 QuickTPBtn.Position = UDim2.new(0.75, 0, 0.72, 0)
 QuickTPBtn.BackgroundColor3 = THEME.AccentCyan
 QuickTPBtn.BackgroundTransparency = 0.2
-QuickTPBtn.Text = "TP Target"
+QuickTPBtn.Text = "TP Aim"
 QuickTPBtn.TextColor3 = THEME.TextBright
 QuickTPBtn.TextSize = 13
 QuickTPBtn.Font = Enum.Font.GothamBold
+QuickTPBtn.Active = true
+QuickTPBtn.ZIndex = 20
 QuickTPBtn.Visible = false
 QuickTPBtn.Parent = FloatingTPGui
 addCorner(QuickTPBtn, 10)
 addStroke(QuickTPBtn, THEME.TextBright, 1.2, 0.35)
 makeDraggable(QuickTPBtn, QuickTPBtn)
 
-local function teleportToPlayer(plr)
-	if not plr or not plr.Character or not LocalPlayer.Character then return end
-	local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
-	local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-	if targetRoot and myRoot then
-		myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 4)
+local function teleportToScreenCenter()
+	local cam = Workspace.CurrentCamera
+	if not cam then return end
+	local myChar = LocalPlayer.Character
+	local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso"))
+	local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+	if not myChar or not myRoot then return end
+
+	local viewportCenter = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
+	local unitRay = cam:ViewportPointToRay(viewportCenter.X, viewportCenter.Y)
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { myChar }
+
+	local result = Workspace:Raycast(unitRay.Origin, unitRay.Direction * 250, params)
+	local targetPos = result and (result.Position + Vector3.new(0, 2.5, 0)) or (unitRay.Origin + unitRay.Direction * 45)
+	local flatLook = Vector3.new(unitRay.Direction.X, 0, unitRay.Direction.Z)
+	local finalCFrame = (flatLook.Magnitude > 0.001)
+		and CFrame.lookAt(targetPos, targetPos + flatLook)
+		or CFrame.new(targetPos)
+
+	if myHum then
+		myHum.Sit = false
+		myHum.PlatformStand = false
 	end
+	myRoot.AssemblyLinearVelocity = Vector3.zero
+	myRoot.AssemblyAngularVelocity = Vector3.zero
+	myRoot.CFrame = finalCFrame
+	pcall(function()
+		myChar:PivotTo(finalCFrame)
+	end)
 end
 
-QuickTPBtn.MouseButton1Click:Connect(function()
-	if selectedTarget then
-		teleportToPlayer(selectedTarget)
-	end
+QuickTPBtn.Activated:Connect(function()
+	teleportToScreenCenter()
 end)
+
+local function getTargetRoot(plr)
+	if not plr or not plr.Parent then
+		return nil
+	end
+	local char = plr.Character
+	if not char then
+		return nil
+	end
+	return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+end
 
 local _, setSpeed = makeToggleRow(pages.Main, "Speed", false, function(on)
 	speedEnabled = on
@@ -585,7 +622,7 @@ end)
 setters.tpBtn = setTpBtn
 
 local playerListFrame = Instance.new("ScrollingFrame")
-playerListFrame.Size = UDim2.new(1, 0, 0, 118)
+playerListFrame.Size = UDim2.new(1, 0, 0, 112)
 playerListFrame.BackgroundColor3 = THEME.GlassCard
 playerListFrame.BackgroundTransparency = THEME.GlassCardAlpha
 playerListFrame.ScrollBarThickness = 3
@@ -695,8 +732,9 @@ resetBtn.MouseButton1Click:Connect(function()
 	end
 end)
 local function getBestTargetInFov()
-	if not Camera then return nil end
-	local center = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
+	local cam = Workspace.CurrentCamera
+	if not cam then return nil end
+	local center = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
 	local bestHead = nil
 	local bestDist = aimFov
 
@@ -705,7 +743,7 @@ local function getBestTargetInFov()
 			local head = plr.Character:FindFirstChild("Head")
 			local hum = plr.Character:FindFirstChildOfClass("Humanoid")
 			if head and hum and hum.Health > 0 then
-				local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+				local screenPos, onScreen = cam:WorldToViewportPoint(head.Position)
 				if onScreen and screenPos.Z > 0 then
 					local d = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
 					if d <= bestDist then
@@ -713,7 +751,7 @@ local function getBestTargetInFov()
 							local params = RaycastParams.new()
 							params.FilterType = Enum.RaycastFilterType.Exclude
 							params.FilterDescendantsInstances = { LocalPlayer.Character, plr.Character }
-							local hit = Workspace:Raycast(Camera.CFrame.Position, head.Position - Camera.CFrame.Position, params)
+							local hit = Workspace:Raycast(cam.CFrame.Position, head.Position - cam.CFrame.Position, params)
 							if hit then
 								continue
 							end
@@ -728,7 +766,56 @@ local function getBestTargetInFov()
 	return bestHead
 end
 
+local cachedProps = {}
+local lastPropScan = 0
+local lastRemoteScan = 0
+local cachedRemotes = {}
+local spamPulseTimer = 0
 local orbitAngle = 0
+
+local function isPartInAnyCharacter(part)
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr.Character and part:IsDescendantOf(plr.Character) then
+			return true
+		end
+	end
+	return false
+end
+
+local function refreshPropCache(char)
+	local list = {}
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and not obj.Anchored and not obj:IsDescendantOf(char) then
+			if not isPartInAnyCharacter(obj) then
+				table.insert(list, obj)
+				if #list >= 140 then
+					break
+				end
+			end
+		end
+	end
+	cachedProps = list
+end
+
+local function refreshSpamRemotes()
+	local list = {}
+	local keywords = { "heavy", "remz", "skill", "atk", "attack", "hit", "damage", "swing", "punch", "shoot", "fire", "use" }
+	for _, desc in ipairs(game:GetDescendants()) do
+		if desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction") then
+			local lowerName = string.lower(desc.Name)
+			for _, kw in ipairs(keywords) do
+				if string.find(lowerName, kw, 1, true) then
+					table.insert(list, desc)
+					break
+				end
+			end
+			if #list >= 40 then
+				break
+			end
+		end
+	end
+	cachedRemotes = list
+end
 
 RunService.Stepped:Connect(function()
 	if noclipEnabled and LocalPlayer.Character then
@@ -741,6 +828,7 @@ RunService.Stepped:Connect(function()
 end)
 
 RunService.Heartbeat:Connect(function(dt)
+	local now = tick()
 	local char = LocalPlayer.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -753,72 +841,101 @@ RunService.Heartbeat:Connect(function(dt)
 		root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, -35, root.AssemblyLinearVelocity.Z)
 	end
 
-	if stickFrontEnabled and selectedTarget and selectedTarget.Character and root then
-		local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+	if stickFrontEnabled and selectedTarget and root then
+		local tRoot = getTargetRoot(selectedTarget)
 		if tRoot then
-			root.CFrame = tRoot.CFrame * CFrame.new(0, 0, -3.5)
+			pcall(function()
+				char:PivotTo(tRoot.CFrame * CFrame.new(0, 0, -3.5))
+			end)
 		end
 	end
 
-	if flingTargetEnabled and selectedTarget and selectedTarget.Character and root then
-		local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+	if flingTargetEnabled and selectedTarget and root then
+		local tRoot = getTargetRoot(selectedTarget)
 		if tRoot then
-			root.CFrame = tRoot.CFrame
-			root.AssemblyAngularVelocity = Vector3.new(0, 999, 0)
-			root.AssemblyLinearVelocity = (tRoot.Position - root.Position).Unit * 180 + Vector3.new(0, 120, 0)
+			pcall(function()
+				char:PivotTo(tRoot.CFrame)
+			end)
+			root.AssemblyAngularVelocity = Vector3.new(0, 1200, 0)
+			root.AssemblyLinearVelocity = (tRoot.Position - root.Position).Unit * 220 + Vector3.new(0, 140, 0)
 		end
 	end
 
-	if root and (flingPropsEnabled or pullOrbitEnabled) then
+	if root and char and (flingPropsEnabled or pullOrbitEnabled) then
+		if now - lastPropScan >= 0.45 then
+			lastPropScan = now
+			refreshPropCache(char)
+		end
+
 		orbitAngle += dt * 4.5
-		for _, obj in ipairs(Workspace:GetDescendants()) do
-			if obj:IsA("BasePart") and not obj.Anchored and not obj:IsDescendantOf(char) then
-				local isCharacterPart = false
-				for _, plr in ipairs(Players:GetPlayers()) do
-					if plr.Character and obj:IsDescendantOf(plr.Character) then
-						isCharacterPart = true
-						break
+		local handled = 0
+		for i = #cachedProps, 1, -1 do
+			local obj = cachedProps[i]
+			if not obj or not obj.Parent or obj.Anchored then
+				table.remove(cachedProps, i)
+			else
+				local dist = (obj.Position - root.Position).Magnitude
+				if pullOrbitEnabled and dist <= pullRange then
+					local offset = Vector3.new(math.cos(orbitAngle) * 8, 2.5, math.sin(orbitAngle) * 8)
+					obj.AssemblyLinearVelocity = ((root.Position + offset) - obj.Position) * 12
+					handled += 1
+				elseif flingPropsEnabled and dist <= flingRange then
+					local dir = obj.Position - root.Position
+					if dir.Magnitude > 0.1 then
+						pcall(function()
+							obj:SetNetworkOwner(LocalPlayer)
+						end)
+						obj.AssemblyLinearVelocity = dir.Unit * 190 + Vector3.new(0, 95, 0)
+						obj.AssemblyAngularVelocity = Vector3.new(120, 220, 120)
+						handled += 1
 					end
 				end
-				if not isCharacterPart then
-					local dist = (obj.Position - root.Position).Magnitude
-					if pullOrbitEnabled and dist <= pullRange then
-						local offset = Vector3.new(math.cos(orbitAngle) * 8, 2.5, math.sin(orbitAngle) * 8)
-						obj.AssemblyLinearVelocity = ((root.Position + offset) - obj.Position) * 10
-					end
-					if flingPropsEnabled and dist <= flingRange then
-						local dir = (obj.Position - root.Position)
-						if dir.Magnitude > 0.1 then
-							obj.AssemblyLinearVelocity = dir.Unit * 140 + Vector3.new(0, 65, 0)
-						end
-					end
+				if handled >= 45 then
+					break
 				end
 			end
 		end
 	end
 
 	if spamHeavyEnabled then
-		for _, desc in ipairs(game:GetDescendants()) do
-			if desc:IsA("RemoteEvent") and string.find(string.lower(desc.Name), "heavy") then
-				pcall(function()
-					desc:FireServer()
-				end)
+		if now - lastRemoteScan >= 2.0 then
+			lastRemoteScan = now
+			refreshSpamRemotes()
+		end
+		spamPulseTimer += dt
+		if spamPulseTimer >= 0.08 then
+			spamPulseTimer = 0
+			for _, remote in ipairs(cachedRemotes) do
+				if remote and remote.Parent then
+					if remote:IsA("RemoteEvent") then
+						pcall(function()
+							remote:FireServer()
+						end)
+					elseif remote:IsA("RemoteFunction") then
+						task.spawn(function()
+							pcall(function()
+								remote:InvokeServer()
+							end)
+						end)
+					end
+				end
 			end
 		end
 	end
 end)
 
 RunService.RenderStepped:Connect(function()
-	if fovCircle and Camera then
+	local cam = Workspace.CurrentCamera
+	if fovCircle and cam then
 		fovCircle.Visible = aimHeadEnabled
 		fovCircle.Radius = aimFov
-		fovCircle.Position = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
+		fovCircle.Position = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
 	end
 
-	if aimHeadEnabled and Camera then
+	if aimHeadEnabled and cam then
 		local head = getBestTargetInFov()
 		if head then
-			Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
+			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, head.Position)
 		end
 	end
 
