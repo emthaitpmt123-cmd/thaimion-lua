@@ -75,32 +75,29 @@ local function isPressInput(input)
 end
 
 local function isMoveInput(input)
-	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch
+	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch
 end
 
 local activeDragSteps = {}
 
 local function makeDraggable(dragHandle, targetFrame)
 	local dragging = false
-	local pointerPos = nil
-	local offsetX = 0
-	local offsetY = 0
+	local dragStart = nil
+	local currentPos = nil
+	local startFramePos = nil
 
 	local function beginDrag(input)
 		if isPressInput(input) then
 			dragging = true
-			pointerPos = Vector2.new(input.Position.X, input.Position.Y)
-			local absPos = targetFrame.AbsolutePosition
-			local parentGui = targetFrame:FindFirstAncestorOfClass("ScreenGui")
-			local insetY = (parentGui and parentGui.IgnoreGuiInset) and 0 or 36
-			offsetX = absPos.X - pointerPos.X
-			offsetY = (absPos.Y + insetY) - pointerPos.Y
+			dragStart = Vector2.new(input.Position.X, input.Position.Y)
+			currentPos = dragStart
+			startFramePos = targetFrame.Position
 		end
 	end
 
 	local function updateDrag(input)
 		if dragging and isMoveInput(input) then
-			pointerPos = Vector2.new(input.Position.X, input.Position.Y)
+			currentPos = Vector2.new(input.Position.X, input.Position.Y)
 		end
 	end
 
@@ -119,8 +116,14 @@ local function makeDraggable(dragHandle, targetFrame)
 	UserInputService.TouchEnded:Connect(finishDrag)
 
 	table.insert(activeDragSteps, function()
-		if dragging and pointerPos then
-			targetFrame.Position = UDim2.new(0, pointerPos.X + offsetX, 0, pointerPos.Y + offsetY)
+		if dragging and dragStart and currentPos and startFramePos then
+			local delta = currentPos - dragStart
+			targetFrame.Position = UDim2.new(
+				startFramePos.X.Scale,
+				startFramePos.X.Offset + delta.X,
+				startFramePos.Y.Scale,
+				startFramePos.Y.Offset + delta.Y
+			)
 		end
 	end)
 end
@@ -588,7 +591,6 @@ local function clearAllEsp()
 	end
 end
 
--- Clean single aim positioning line + FOV ring (no IgnoreGuiInset offset mismatch)
 local TracerGui = Instance.new("ScreenGui")
 TracerGui.Name = "ThaiMionElite_TracerGui"
 TracerGui.ResetOnSpawn = false
