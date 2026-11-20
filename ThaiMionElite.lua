@@ -70,70 +70,90 @@ local function addStroke(inst, color, thickness, transparency)
 	return s
 end
 
-local function isTouchOrLeftClick(input)
+local function isPointerStart(input)
 	local t = input.UserInputType
 	return t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1
 end
 
-local function isTouchOrMouseMove(input)
-	local t = input.UserInputType
-	return t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseMovement
+local function clampPositionToScreen(target, xOffset, yOffset)
+	local cam = Workspace.CurrentCamera
+	local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+	local w = math.max(40, target.AbsoluteSize.X)
+	local h = math.max(24, target.AbsoluteSize.Y)
+	local maxX = math.max(6, vp.X - w - 6)
+	local maxY = math.max(6, vp.Y - h - 6)
+	local cx = math.clamp(math.floor(xOffset + 0.5), 6, maxX)
+	local cy = math.clamp(math.floor(yOffset + 0.5), 6, maxY)
+	return UDim2.new(0, cx, 0, cy)
 end
 
 local function attachFreeDrag(handle, target, onTapCallback)
 	local activeInput = nil
-	local originPointer = nil
-	local originTargetPos = nil
-	local movedDistance = 0
+	local startPos = nil
+	local startTarget = nil
+	local changedConn = nil
+	local endedConn = nil
+	local dragged = false
 
-	local function lockToPixelPosition()
-		local absPos = target.AbsolutePosition
-		target.Position = UDim2.new(0, math.floor(absPos.X + 0.5), 0, math.floor(absPos.Y + 0.5))
+	local function cleanup()
+		if changedConn then
+			changedConn:Disconnect()
+			changedConn = nil
+		end
+		if endedConn then
+			endedConn:Disconnect()
+			endedConn = nil
+		end
+		activeInput = nil
+		startPos = nil
+		startTarget = nil
 	end
 
 	handle.InputBegan:Connect(function(input)
-		if activeInput == nil and isTouchOrLeftClick(input) then
-			lockToPixelPosition()
-			activeInput = input
-			originPointer = Vector2.new(input.Position.X, input.Position.Y)
-			originTargetPos = target.Position
-			movedDistance = 0
+		if activeInput ~= nil or not isPointerStart(input) then
+			return
 		end
-	end)
+		activeInput = input
+		startPos = Vector2.new(input.Position.X, input.Position.Y)
+		startTarget = clampPositionToScreen(target, target.AbsolutePosition.X, target.AbsolutePosition.Y)
+		target.Position = startTarget
+		dragged = false
 
-	local function stepMove(input)
-		if activeInput ~= nil and input == activeInput and isTouchOrMouseMove(input) and originPointer and originTargetPos then
-			local cur = Vector2.new(input.Position.X, input.Position.Y)
-			local delta = cur - originPointer
-			movedDistance = math.max(movedDistance, delta.Magnitude)
-			target.Position = UDim2.new(
-				0,
-				math.floor(originTargetPos.X.Offset + delta.X + 0.5),
-				0,
-				math.floor(originTargetPos.Y.Offset + delta.Y + 0.5)
-			)
-		end
-	end
+		changedConn = input.Changed:Connect(function()
+			if input ~= activeInput or not startPos or not startTarget then
+				return
+			end
+			if input.UserInputState == Enum.UserInputState.Change then
+				local cur = Vector2.new(input.Position.X, input.Position.Y)
+				local dx = cur.X - startPos.X
+				local dy = cur.Y - startPos.Y
+				if math.abs(dx) > 6 or math.abs(dy) > 6 then
+					dragged = true
+				end
+				if dragged then
+					target.Position = clampPositionToScreen(
+						target,
+						startTarget.X.Offset + dx,
+						startTarget.Y.Offset + dy
+					)
+				end
+			elseif input.UserInputState == Enum.UserInputState.End or input.UserInputState == Enum.UserInputState.Cancel then
+				local wasTap = not dragged
+				cleanup()
+				if wasTap and onTapCallback then
+					onTapCallback()
+				end
+			end
+		end)
 
-	handle.InputChanged:Connect(stepMove)
-	UserInputService.InputChanged:Connect(stepMove)
-	UserInputService.TouchMoved:Connect(stepMove)
-
-	local function stepEnd(input)
-		if activeInput ~= nil and input == activeInput then
-			local wasTap = (movedDistance < 8)
-			activeInput = nil
-			originPointer = nil
-			originTargetPos = nil
+		endedConn = input.Ended:Connect(function()
+			local wasTap = not dragged
+			cleanup()
 			if wasTap and onTapCallback then
 				onTapCallback()
 			end
-		end
-	end
-
-	handle.InputEnded:Connect(stepEnd)
-	UserInputService.InputEnded:Connect(stepEnd)
-	UserInputService.TouchEnded:Connect(stepEnd)
+		end)
+	end)
 end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ThaiMionElite_LiquidGlass"
@@ -489,7 +509,9 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	addCorner(knob, 8)
 	addStroke(knob, THEME.AccentCyan, 1.5, 0.1)
 
-	local activeSlideInput = nil
+	local activeInput = nil
+	local changedConn = nil
+	local endedConn = nil
 	local parentScroll = getParentScrollPage(card)
 
 	local function setSliderByX(posX)
@@ -509,39 +531,48 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 		end
 	end
 
+	local function finishSlide()
+		if changedConn then
+			changedConn:Disconnect()
+			changedConn = nil
+		end
+		if endedConn then
+			endedConn:Disconnect()
+			endedConn = nil
+		end
+		activeInput = nil
+		if parentScroll then
+			parentScroll.ScrollingEnabled = true
+		end
+	end
+
 	hitBox.InputBegan:Connect(function(input)
-		if activeSlideInput == nil and isTouchOrLeftClick(input) then
-			activeSlideInput = input
-			if parentScroll then
-				parentScroll.ScrollingEnabled = false
-			end
-			setSliderByX(input.Position.X)
+		if activeInput ~= nil or not isPointerStart(input) then
+			return
 		end
+		activeInput = input
+		if parentScroll then
+			parentScroll.ScrollingEnabled = false
+		end
+		setSliderByX(input.Position.X)
+
+		changedConn = input.Changed:Connect(function()
+			if input ~= activeInput then
+				return
+			end
+			if input.UserInputState == Enum.UserInputState.Change then
+				setSliderByX(input.Position.X)
+			elseif input.UserInputState == Enum.UserInputState.End or input.UserInputState == Enum.UserInputState.Cancel then
+				setSliderByX(input.Position.X)
+				finishSlide()
+			end
+		end)
+
+		endedConn = input.Ended:Connect(function()
+			setSliderByX(input.Position.X)
+			finishSlide()
+		end)
 	end)
-
-	local function onSlideMove(input)
-		if activeSlideInput ~= nil and input == activeSlideInput and isTouchOrMouseMove(input) then
-			setSliderByX(input.Position.X)
-		end
-	end
-
-	hitBox.InputChanged:Connect(onSlideMove)
-	UserInputService.InputChanged:Connect(onSlideMove)
-	UserInputService.TouchMoved:Connect(onSlideMove)
-
-	local function onSlideEnd(input)
-		if activeSlideInput ~= nil and input == activeSlideInput then
-			setSliderByX(input.Position.X)
-			activeSlideInput = nil
-			if parentScroll then
-				parentScroll.ScrollingEnabled = true
-			end
-		end
-	end
-
-	hitBox.InputEnded:Connect(onSlideEnd)
-	UserInputService.InputEnded:Connect(onSlideEnd)
-	UserInputService.TouchEnded:Connect(onSlideEnd)
 end
 local speedEnabled = false
 local speedValue = 50
@@ -602,7 +633,8 @@ local FloatingTPGui = Instance.new("ScreenGui")
 FloatingTPGui.Name = "ThaiMionElite_TPFloatingGui"
 FloatingTPGui.ResetOnSpawn = false
 FloatingTPGui.IgnoreGuiInset = true
-FloatingTPGui.DisplayOrder = 40
+FloatingTPGui.DisplayOrder = 60
+FloatingTPGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 FloatingTPGui.Parent = PGui
 
 local function teleportAlongScreenCenter()
@@ -642,21 +674,22 @@ local function teleportAlongScreenCenter()
 end
 
 local QuickTPBtn = Instance.new("TextButton")
+QuickTPBtn.Name = "QuickTPButton"
 QuickTPBtn.Size = UDim2.new(0, 126, 0, 38)
-QuickTPBtn.Position = UDim2.new(0, 560, 0, 440)
+QuickTPBtn.Position = UDim2.new(0, 260, 0, 250)
 QuickTPBtn.BackgroundColor3 = THEME.AccentCyan
-QuickTPBtn.BackgroundTransparency = 0.2
+QuickTPBtn.BackgroundTransparency = 0.15
 QuickTPBtn.Text = "TP TM"
 QuickTPBtn.TextColor3 = THEME.TextBright
 QuickTPBtn.TextSize = 13
 QuickTPBtn.Font = Enum.Font.GothamBold
 QuickTPBtn.AutoButtonColor = false
 QuickTPBtn.Active = true
-QuickTPBtn.ZIndex = 20
+QuickTPBtn.ZIndex = 25
 QuickTPBtn.Visible = false
 QuickTPBtn.Parent = FloatingTPGui
 addCorner(QuickTPBtn, 10)
-addStroke(QuickTPBtn, THEME.TextBright, 1.2, 0.35)
+addStroke(QuickTPBtn, THEME.TextBright, 1.3, 0.25)
 attachFreeDrag(QuickTPBtn, QuickTPBtn, teleportAlongScreenCenter)
 
 local function getTargetHeadOrRoot(plr)
@@ -730,6 +763,9 @@ setters.esp = setEsp
 local _, setTpBtn = makeToggleRow(pages.Teleport, "Activate TP Button", false, function(on)
 	tpButtonActive = on
 	QuickTPBtn.Visible = on
+	if on then
+		QuickTPBtn.Position = clampPositionToScreen(QuickTPBtn, QuickTPBtn.AbsolutePosition.X, QuickTPBtn.AbsolutePosition.Y)
+	end
 end)
 setters.tpBtn = setTpBtn
 
