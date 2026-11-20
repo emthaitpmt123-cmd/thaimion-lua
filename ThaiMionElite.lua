@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local GuiService = game:GetService("GuiService")
 local Workspace = game:GetService("Workspace")
 local Stats = game:GetService("Stats")
 local CoreGui = game:GetService("CoreGui")
@@ -71,84 +70,82 @@ local function addStroke(inst, color, thickness, transparency)
 	return s
 end
 
-local function isPressInput(input)
-	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+local function isTouchOrLeftClick(input)
+	local t = input.UserInputType
+	return t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1
 end
 
-local function isMoveInput(input)
-	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch
+local function isTouchOrMouseMove(input)
+	local t = input.UserInputType
+	return t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseMovement
 end
 
-local activeDragSteps = {}
+local function attachFreeDrag(handle, target, onTapCallback)
+	local activeInput = nil
+	local originPointer = nil
+	local originTargetPos = nil
+	local movedDistance = 0
 
-local function makeDraggable(dragHandle, targetFrame)
-	local hasNativeDetector = false
-	pcall(function()
-		local detector = Instance.new("UIDragDetector")
-		detector.DragStyle = Enum.UIDragDetectorDragStyle.TranslateLine
-		detector.Parent = targetFrame
-		hasNativeDetector = true
-	end)
-	if hasNativeDetector then
-		return
+	local function lockToPixelPosition()
+		local absPos = target.AbsolutePosition
+		target.Position = UDim2.new(0, math.floor(absPos.X + 0.5), 0, math.floor(absPos.Y + 0.5))
 	end
 
-	local dragging = false
-	local startPointer = nil
-	local startOffset = nil
-
-	local function beginDrag(input)
-		if isPressInput(input) then
-			dragging = true
-			startPointer = Vector2.new(input.Position.X, input.Position.Y)
-			local inset = GuiService:GetGuiInset()
-			local absPos = targetFrame.AbsolutePosition - inset
-			targetFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y)
-			startOffset = Vector2.new(absPos.X, absPos.Y)
-		end
-	end
-
-	local function updateDrag(input)
-		if dragging and isMoveInput(input) and startPointer and startOffset then
-			local curPointer = Vector2.new(input.Position.X, input.Position.Y)
-			local delta = curPointer - startPointer
-			targetFrame.Position = UDim2.new(0, startOffset.X + delta.X, 0, startOffset.Y + delta.Y)
-		end
-	end
-
-	local function endDrag(input)
-		if dragging and (input == nil or isPressInput(input)) then
-			dragging = false
-		end
-	end
-
-	dragHandle.InputBegan:Connect(beginDrag)
-	dragHandle.InputChanged:Connect(updateDrag)
-	dragHandle.InputEnded:Connect(endDrag)
-	UserInputService.InputChanged:Connect(updateDrag)
-	UserInputService.TouchMoved:Connect(updateDrag)
-	UserInputService.InputEnded:Connect(endDrag)
-	UserInputService.TouchEnded:Connect(endDrag)
-
-	table.insert(activeDragSteps, function()
-		if dragging and startPointer and startOffset then
-			local curPointer = UserInputService:GetMouseLocation()
-			local inset = GuiService:GetGuiInset()
-			local adjPointer = curPointer - inset
-			local delta = adjPointer - startPointer
-			targetFrame.Position = UDim2.new(0, startOffset.X + delta.X, 0, startOffset.Y + delta.Y)
+	handle.InputBegan:Connect(function(input)
+		if activeInput == nil and isTouchOrLeftClick(input) then
+			lockToPixelPosition()
+			activeInput = input
+			originPointer = Vector2.new(input.Position.X, input.Position.Y)
+			originTargetPos = target.Position
+			movedDistance = 0
 		end
 	end)
+
+	local function stepMove(input)
+		if activeInput ~= nil and input == activeInput and isTouchOrMouseMove(input) and originPointer and originTargetPos then
+			local cur = Vector2.new(input.Position.X, input.Position.Y)
+			local delta = cur - originPointer
+			movedDistance = math.max(movedDistance, delta.Magnitude)
+			target.Position = UDim2.new(
+				0,
+				math.floor(originTargetPos.X.Offset + delta.X + 0.5),
+				0,
+				math.floor(originTargetPos.Y.Offset + delta.Y + 0.5)
+			)
+		end
+	end
+
+	handle.InputChanged:Connect(stepMove)
+	UserInputService.InputChanged:Connect(stepMove)
+	UserInputService.TouchMoved:Connect(stepMove)
+
+	local function stepEnd(input)
+		if activeInput ~= nil and input == activeInput then
+			local wasTap = (movedDistance < 8)
+			activeInput = nil
+			originPointer = nil
+			originTargetPos = nil
+			if wasTap and onTapCallback then
+				onTapCallback()
+			end
+		end
+	end
+
+	handle.InputEnded:Connect(stepEnd)
+	UserInputService.InputEnded:Connect(stepEnd)
+	UserInputService.TouchEnded:Connect(stepEnd)
 end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ThaiMionElite_LiquidGlass"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PGui
 
 local BannerGui = Instance.new("ScreenGui")
 BannerGui.Name = "ThaiMionElite_BannerGui"
 BannerGui.ResetOnSpawn = false
+BannerGui.IgnoreGuiInset = true
 BannerGui.DisplayOrder = 50
 BannerGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 BannerGui.Parent = PGui
@@ -156,6 +153,7 @@ BannerGui.Parent = PGui
 local StatsGui = Instance.new("ScreenGui")
 StatsGui.Name = "ThaiMionElite_StatsGui"
 StatsGui.ResetOnSpawn = false
+StatsGui.IgnoreGuiInset = true
 StatsGui.DisplayOrder = 45
 StatsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 StatsGui.Parent = PGui
@@ -163,7 +161,7 @@ StatsGui.Parent = PGui
 local TopStatsBar = Instance.new("Frame")
 TopStatsBar.Name = "TopStatsBar"
 TopStatsBar.Size = UDim2.new(0, 256, 0, 26)
-TopStatsBar.Position = UDim2.new(0.5, -128, 0, 8)
+TopStatsBar.Position = UDim2.new(0, 220, 0, 10)
 TopStatsBar.BackgroundColor3 = THEME.GlassMain
 TopStatsBar.BackgroundTransparency = 0.28
 TopStatsBar.BorderSizePixel = 0
@@ -172,7 +170,7 @@ TopStatsBar.Visible = false
 TopStatsBar.Parent = StatsGui
 addCorner(TopStatsBar, 8)
 addStroke(TopStatsBar, THEME.AccentCyan, 1.15, 0.35)
-makeDraggable(TopStatsBar, TopStatsBar)
+attachFreeDrag(TopStatsBar, TopStatsBar)
 
 local StatsLabel = Instance.new("TextLabel")
 StatsLabel.Size = UDim2.new(1, -12, 1, 0)
@@ -233,7 +231,7 @@ local function showSuccessBanner(titleText, subText)
 	slideIn:Play()
 	slideIn.Completed:Wait()
 
-	task.wait(2.0)
+	task.wait(1.8)
 
 	local slideOut = TweenService:Create(banner, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
 		Position = UDim2.new(0.5, -155, 0, -70)
@@ -249,7 +247,7 @@ local MINI_SIZE = UDim2.new(0, 225, 0, 38)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = FULL_SIZE
-MainFrame.Position = UDim2.new(0.5, -225, 0.5, -157)
+MainFrame.Position = UDim2.new(0, 140, 0, 52)
 MainFrame.BackgroundColor3 = THEME.GlassMain
 MainFrame.BackgroundTransparency = THEME.GlassMainAlpha
 MainFrame.BorderSizePixel = 0
@@ -260,24 +258,17 @@ MainFrame.Parent = ScreenGui
 addCorner(MainFrame, 14)
 addStroke(MainFrame, THEME.StrokeSoft, 1.35, THEME.StrokeAlpha)
 
-local sheenStrip = Instance.new("Frame")
-sheenStrip.Size = UDim2.new(1, -24, 0, 1)
-sheenStrip.Position = UDim2.new(0, 12, 0, 1)
-sheenStrip.BackgroundColor3 = THEME.TextBright
-sheenStrip.BackgroundTransparency = 0.72
-sheenStrip.BorderSizePixel = 0
-sheenStrip.Parent = MainFrame
-
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 38)
+TopBar.Size = UDim2.new(1, -66, 0, 38)
+TopBar.Position = UDim2.new(0, 0, 0, 0)
 TopBar.BackgroundTransparency = 1
 TopBar.Active = true
 TopBar.Parent = MainFrame
-makeDraggable(TopBar, MainFrame)
+attachFreeDrag(TopBar, MainFrame)
 
 local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, -76, 1, 0)
+TitleLabel.Size = UDim2.new(1, -12, 1, 0)
 TitleLabel.Position = UDim2.new(0, 12, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Text = "THAIMION ELITE"
@@ -290,27 +281,27 @@ TitleLabel.Parent = TopBar
 
 local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.new(0, 26, 0, 22)
-MinBtn.Position = UDim2.new(1, -62, 0.5, -11)
+MinBtn.Position = UDim2.new(1, -62, 0, 8)
 MinBtn.BackgroundColor3 = THEME.GlassCard
 MinBtn.BackgroundTransparency = 0.3
 MinBtn.Text = "-"
 MinBtn.TextColor3 = THEME.TextBright
 MinBtn.TextSize = 14
 MinBtn.Font = Enum.Font.GothamBold
-MinBtn.Parent = TopBar
+MinBtn.Parent = MainFrame
 addCorner(MinBtn, 6)
 addStroke(MinBtn, THEME.StrokeSoft, 1, 0.5)
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 26, 0, 22)
-CloseBtn.Position = UDim2.new(1, -32, 0.5, -11)
+CloseBtn.Position = UDim2.new(1, -32, 0, 8)
 CloseBtn.BackgroundColor3 = THEME.AccentRed
 CloseBtn.BackgroundTransparency = 0.25
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = THEME.TextBright
 CloseBtn.TextSize = 12
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Parent = TopBar
+CloseBtn.Parent = MainFrame
 addCorner(CloseBtn, 6)
 
 local TabBar = Instance.new("Frame")
@@ -443,8 +434,6 @@ local function getParentScrollPage(inst)
 	return nil
 end
 
-local activeSliderSteps = {}
-
 local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, unitSuffix, onChanged)
 	local currentVal = math.clamp(defaultVal, minVal, maxVal)
 	local card = Instance.new("Frame")
@@ -500,11 +489,10 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	addCorner(knob, 8)
 	addStroke(knob, THEME.AccentCyan, 1.5, 0.1)
 
-	local sliding = false
-	local pointerX = nil
+	local activeSlideInput = nil
 	local parentScroll = getParentScrollPage(card)
 
-	local function applyPosX(posX)
+	local function setSliderByX(posX)
 		local absPos = track.AbsolutePosition.X
 		local absSize = math.max(1, track.AbsoluteSize.X)
 		local r = math.clamp((posX - absPos) / absSize, 0, 1)
@@ -521,56 +509,45 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 		end
 	end
 
-	local function beginSlide(input)
-		if isPressInput(input) then
-			sliding = true
-			pointerX = input.Position.X
+	hitBox.InputBegan:Connect(function(input)
+		if activeSlideInput == nil and isTouchOrLeftClick(input) then
+			activeSlideInput = input
 			if parentScroll then
 				parentScroll.ScrollingEnabled = false
 			end
-			applyPosX(pointerX)
+			setSliderByX(input.Position.X)
+		end
+	end)
+
+	local function onSlideMove(input)
+		if activeSlideInput ~= nil and input == activeSlideInput and isTouchOrMouseMove(input) then
+			setSliderByX(input.Position.X)
 		end
 	end
 
-	local function moveSlide(input)
-		if sliding and isMoveInput(input) then
-			pointerX = input.Position.X
-		end
-	end
+	hitBox.InputChanged:Connect(onSlideMove)
+	UserInputService.InputChanged:Connect(onSlideMove)
+	UserInputService.TouchMoved:Connect(onSlideMove)
 
-	local function endSlide(input)
-		if sliding and (input == nil or isPressInput(input)) then
-			sliding = false
-			pointerX = nil
+	local function onSlideEnd(input)
+		if activeSlideInput ~= nil and input == activeSlideInput then
+			setSliderByX(input.Position.X)
+			activeSlideInput = nil
 			if parentScroll then
 				parentScroll.ScrollingEnabled = true
 			end
 		end
 	end
 
-	hitBox.InputBegan:Connect(beginSlide)
-	hitBox.InputChanged:Connect(moveSlide)
-	hitBox.InputEnded:Connect(endSlide)
-	track.InputBegan:Connect(beginSlide)
-	track.InputChanged:Connect(moveSlide)
-	track.InputEnded:Connect(endSlide)
-	UserInputService.InputChanged:Connect(moveSlide)
-	UserInputService.TouchMoved:Connect(moveSlide)
-	UserInputService.InputEnded:Connect(endSlide)
-	UserInputService.TouchEnded:Connect(endSlide)
-
-	table.insert(activeSliderSteps, function()
-		if sliding and pointerX then
-			applyPosX(pointerX)
-		end
-	end)
+	hitBox.InputEnded:Connect(onSlideEnd)
+	UserInputService.InputEnded:Connect(onSlideEnd)
+	UserInputService.TouchEnded:Connect(onSlideEnd)
 end
 local speedEnabled = false
 local speedValue = 50
 local noclipEnabled = false
 local antiFallEnabled = false
 local aimHeadEnabled = false
-local aimTracerEnabled = true
 local aimFov = 140
 local wallbangEnabled = false
 local espEnabled = false
@@ -581,13 +558,12 @@ local stickFrontEnabled = false
 local flingTargetEnabled = false
 
 local spamHeavyEnabled = false
-local flingRange = 65
 local pullRange = 55
-local flingPropsEnabled = false
 local pullOrbitEnabled = false
 
 local setters = {}
 local espObjects = {}
+local flingSpinAngle = 0
 
 local function clearEspForPlayer(plr)
 	local data = espObjects[plr]
@@ -607,6 +583,7 @@ end
 local TracerGui = Instance.new("ScreenGui")
 TracerGui.Name = "ThaiMionElite_TracerGui"
 TracerGui.ResetOnSpawn = false
+TracerGui.IgnoreGuiInset = true
 TracerGui.DisplayOrder = 30
 TracerGui.Parent = PGui
 
@@ -621,56 +598,12 @@ fovRingFrame.Parent = TracerGui
 addCorner(fovRingFrame, 999)
 addStroke(fovRingFrame, THEME.AccentGreen, 1.6, 0.15)
 
-local aimTracerBar = Instance.new("Frame")
-aimTracerBar.Name = "AimTracerLine"
-aimTracerBar.AnchorPoint = Vector2.new(0.5, 0.5)
-aimTracerBar.Size = UDim2.new(0, 0, 0, 2)
-aimTracerBar.BackgroundColor3 = THEME.AccentCyan
-aimTracerBar.BackgroundTransparency = 0.12
-aimTracerBar.BorderSizePixel = 0
-aimTracerBar.Visible = false
-aimTracerBar.Parent = TracerGui
-
-local function hideTracerLine()
-	aimTracerBar.Visible = false
-end
-
-local function drawCleanTracer(p1, p2)
-	local delta = p2 - p1
-	local len = delta.Magnitude
-	if len < 4 then
-		aimTracerBar.Visible = false
-		return
-	end
-	local mid = (p1 + p2) * 0.5
-	aimTracerBar.Position = UDim2.new(0, mid.X, 0, mid.Y)
-	aimTracerBar.Size = UDim2.new(0, len, 0, 2)
-	aimTracerBar.Rotation = math.deg(math.atan2(delta.Y, delta.X))
-	aimTracerBar.Visible = true
-end
-
 local FloatingTPGui = Instance.new("ScreenGui")
 FloatingTPGui.Name = "ThaiMionElite_TPFloatingGui"
 FloatingTPGui.ResetOnSpawn = false
+FloatingTPGui.IgnoreGuiInset = true
 FloatingTPGui.DisplayOrder = 40
 FloatingTPGui.Parent = PGui
-
-local QuickTPBtn = Instance.new("TextButton")
-QuickTPBtn.Size = UDim2.new(0, 126, 0, 38)
-QuickTPBtn.Position = UDim2.new(0.75, 0, 0.72, 0)
-QuickTPBtn.BackgroundColor3 = THEME.AccentCyan
-QuickTPBtn.BackgroundTransparency = 0.2
-QuickTPBtn.Text = "TP TM"
-QuickTPBtn.TextColor3 = THEME.TextBright
-QuickTPBtn.TextSize = 13
-QuickTPBtn.Font = Enum.Font.GothamBold
-QuickTPBtn.Active = true
-QuickTPBtn.ZIndex = 20
-QuickTPBtn.Visible = false
-QuickTPBtn.Parent = FloatingTPGui
-addCorner(QuickTPBtn, 10)
-addStroke(QuickTPBtn, THEME.TextBright, 1.2, 0.35)
-makeDraggable(QuickTPBtn, QuickTPBtn)
 
 local function teleportAlongScreenCenter()
 	local cam = Workspace.CurrentCamera
@@ -708,9 +641,23 @@ local function teleportAlongScreenCenter()
 	end)
 end
 
-QuickTPBtn.Activated:Connect(function()
-	teleportAlongScreenCenter()
-end)
+local QuickTPBtn = Instance.new("TextButton")
+QuickTPBtn.Size = UDim2.new(0, 126, 0, 38)
+QuickTPBtn.Position = UDim2.new(0, 560, 0, 440)
+QuickTPBtn.BackgroundColor3 = THEME.AccentCyan
+QuickTPBtn.BackgroundTransparency = 0.2
+QuickTPBtn.Text = "TP TM"
+QuickTPBtn.TextColor3 = THEME.TextBright
+QuickTPBtn.TextSize = 13
+QuickTPBtn.Font = Enum.Font.GothamBold
+QuickTPBtn.AutoButtonColor = false
+QuickTPBtn.Active = true
+QuickTPBtn.ZIndex = 20
+QuickTPBtn.Visible = false
+QuickTPBtn.Parent = FloatingTPGui
+addCorner(QuickTPBtn, 10)
+addStroke(QuickTPBtn, THEME.TextBright, 1.2, 0.35)
+attachFreeDrag(QuickTPBtn, QuickTPBtn, teleportAlongScreenCenter)
 
 local function getTargetHeadOrRoot(plr)
 	if not plr or not plr.Parent then
@@ -759,19 +706,8 @@ setters.antiFall = setAntiFall
 local _, setAimHead = makeToggleRow(pages.Main, "Aim Head (FOV)", false, function(on)
 	aimHeadEnabled = on
 	fovRingFrame.Visible = on
-	if not on then
-		hideTracerLine()
-	end
 end)
 setters.aimHead = setAimHead
-
-local _, setAimTracer = makeToggleRow(pages.Main, "Aim Tracer Lines", true, function(on)
-	aimTracerEnabled = on
-	if not on then
-		hideTracerLine()
-	end
-end)
-setters.aimTracer = setAimTracer
 
 makeSliderCard(pages.Main, "Aim FOV Radius", 40, 350, aimFov, " px", function(v)
 	aimFov = v
@@ -884,18 +820,9 @@ local _, setSpam = makeToggleRow(pages["Lag Tool TM"], "Spam Heavy Remz", false,
 end)
 setters.spam = setSpam
 
-makeSliderCard(pages["Lag Tool TM"], "Fling Range", 10, 200, flingRange, " studs", function(v)
-	flingRange = v
-end)
-
 makeSliderCard(pages["Lag Tool TM"], "Pull Range", 10, 200, pullRange, " studs", function(v)
 	pullRange = v
 end)
-
-local _, setProps = makeToggleRow(pages["Lag Tool TM"], "Fling Props", false, function(on)
-	flingPropsEnabled = on
-end)
-setters.props = setProps
 
 local _, setOrbit = makeToggleRow(pages["Lag Tool TM"], "Pull Orbit", false, function(on)
 	pullOrbitEnabled = on
@@ -918,7 +845,6 @@ resetBtn.Activated:Connect(function()
 	for _, fn in pairs(setters) do
 		fn(false)
 	end
-	hideTracerLine()
 	local char = LocalPlayer.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if hum then
@@ -927,10 +853,9 @@ resetBtn.Activated:Connect(function()
 end)
 local function getBestTargetInFov()
 	local cam = Workspace.CurrentCamera
-	if not cam then return nil, nil end
+	if not cam then return nil end
 	local center = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
 	local bestHead = nil
-	local bestScreenPt = nil
 	local bestDist = aimFov
 
 	for _, plr in ipairs(Players:GetPlayers()) do
@@ -954,13 +879,12 @@ local function getBestTargetInFov()
 						end
 						bestDist = d
 						bestHead = head
-						bestScreenPt = pt
 					end
 				end
 			end
 		end
 	end
-	return bestHead, bestScreenPt
+	return bestHead
 end
 
 local cachedProps = {}
@@ -1039,7 +963,7 @@ local function getMemoryMb()
 end
 
 RunService.Stepped:Connect(function()
-	if noclipEnabled and LocalPlayer.Character then
+	if (noclipEnabled or flingTargetEnabled) and LocalPlayer.Character then
 		for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
 			if part:IsA("BasePart") then
 				part.CanCollide = false
@@ -1084,21 +1008,29 @@ RunService.Heartbeat:Connect(function(dt)
 	if flingTargetEnabled and selectedTarget and char and root then
 		local _, tRoot = getTargetHeadOrRoot(selectedTarget)
 		if tRoot then
-			local flingCF = tRoot.CFrame * CFrame.new(0, 0, -2)
+			flingSpinAngle += dt * 45
+			local contactOffset = Vector3.new(math.cos(flingSpinAngle) * 1.4, 0, math.sin(flingSpinAngle) * 1.4)
+			local targetPos = tRoot.Position + contactOffset
+			local flingCF = CFrame.new(targetPos) * CFrame.Angles(0, flingSpinAngle, math.rad(35))
+			if hum then
+				hum.Sit = false
+			end
 			root.CFrame = flingCF
 			pcall(function()
 				char:PivotTo(flingCF)
 			end)
-			local pushDir = (tRoot.Position - root.Position)
-			if pushDir.Magnitude < 0.2 then
-				pushDir = tRoot.CFrame.LookVector
+			local pushOut = (tRoot.Position - root.Position)
+			if pushOut.Magnitude < 0.25 then
+				pushOut = Vector3.new(math.cos(flingSpinAngle), 0.6, math.sin(flingSpinAngle))
+			else
+				pushOut = (pushOut.Unit + Vector3.new(0, 0.55, 0)).Unit
 			end
-			root.AssemblyLinearVelocity = pushDir.Unit * 110 + Vector3.new(0, 55, 0)
-			root.AssemblyAngularVelocity = Vector3.new(0, 65, 0)
+			root.AssemblyLinearVelocity = pushOut * 145
+			root.AssemblyAngularVelocity = Vector3.new(260, 420, 260)
 		end
 	end
 
-	if root and char and (flingPropsEnabled or pullOrbitEnabled) then
+	if pullOrbitEnabled and root and char then
 		if now - lastPropScan >= 0.45 then
 			lastPropScan = now
 			refreshPropCache(char)
@@ -1112,20 +1044,13 @@ RunService.Heartbeat:Connect(function(dt)
 				table.remove(cachedProps, i)
 			else
 				local dist = (obj.Position - root.Position).Magnitude
-				if pullOrbitEnabled and dist <= pullRange then
+				if dist <= pullRange then
+					pcall(function()
+						obj:SetNetworkOwner(LocalPlayer)
+					end)
 					local offset = Vector3.new(math.cos(orbitAngle) * 8, 2.5, math.sin(orbitAngle) * 8)
 					obj.AssemblyLinearVelocity = ((root.Position + offset) - obj.Position) * 12
 					handled += 1
-				elseif flingPropsEnabled and dist <= flingRange then
-					local dir = obj.Position - root.Position
-					if dir.Magnitude > 0.1 then
-						pcall(function()
-							obj:SetNetworkOwner(LocalPlayer)
-						end)
-						obj.AssemblyLinearVelocity = dir.Unit * 190 + Vector3.new(0, 95, 0)
-						obj.AssemblyAngularVelocity = Vector3.new(120, 220, 120)
-						handled += 1
-					end
 				end
 				if handled >= 45 then
 					break
@@ -1162,13 +1087,6 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 RunService.RenderStepped:Connect(function(dt)
-	for _, dragFn in ipairs(activeDragSteps) do
-		dragFn()
-	end
-	for _, sliderFn in ipairs(activeSliderSteps) do
-		sliderFn()
-	end
-
 	fpsCounter += 1
 	fpsTimer += dt
 	if fpsTimer >= 0.5 then
@@ -1188,17 +1106,10 @@ RunService.RenderStepped:Connect(function(dt)
 	fovRingFrame.Position = UDim2.new(0, center.X, 0, center.Y)
 
 	if aimHeadEnabled and cam then
-		local head, lockedPt = getBestTargetInFov()
+		local head = getBestTargetInFov()
 		if head then
 			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, head.Position)
 		end
-		if aimTracerEnabled and lockedPt then
-			drawCleanTracer(center, lockedPt)
-		else
-			hideTracerLine()
-		end
-	else
-		hideTracerLine()
 	end
 
 	if espEnabled then
@@ -1263,7 +1174,6 @@ end)
 
 CloseBtn.Activated:Connect(function()
 	clearAllEsp()
-	hideTracerLine()
 	if FloatingTPGui then
 		pcall(function() FloatingTPGui:Destroy() end)
 	end
