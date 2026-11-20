@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local Workspace = game:GetService("Workspace")
 local Stats = game:GetService("Stats")
 local CoreGui = game:GetService("CoreGui")
@@ -81,27 +82,41 @@ end
 local activeDragSteps = {}
 
 local function makeDraggable(dragHandle, targetFrame)
+	local hasNativeDetector = false
+	pcall(function()
+		local detector = Instance.new("UIDragDetector")
+		detector.DragStyle = Enum.UIDragDetectorDragStyle.TranslateLine
+		detector.Parent = targetFrame
+		hasNativeDetector = true
+	end)
+	if hasNativeDetector then
+		return
+	end
+
 	local dragging = false
-	local dragStart = nil
-	local currentPos = nil
-	local startFramePos = nil
+	local startPointer = nil
+	local startOffset = nil
 
 	local function beginDrag(input)
 		if isPressInput(input) then
 			dragging = true
-			dragStart = Vector2.new(input.Position.X, input.Position.Y)
-			currentPos = dragStart
-			startFramePos = targetFrame.Position
+			startPointer = Vector2.new(input.Position.X, input.Position.Y)
+			local inset = GuiService:GetGuiInset()
+			local absPos = targetFrame.AbsolutePosition - inset
+			targetFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y)
+			startOffset = Vector2.new(absPos.X, absPos.Y)
 		end
 	end
 
 	local function updateDrag(input)
-		if dragging and isMoveInput(input) then
-			currentPos = Vector2.new(input.Position.X, input.Position.Y)
+		if dragging and isMoveInput(input) and startPointer and startOffset then
+			local curPointer = Vector2.new(input.Position.X, input.Position.Y)
+			local delta = curPointer - startPointer
+			targetFrame.Position = UDim2.new(0, startOffset.X + delta.X, 0, startOffset.Y + delta.Y)
 		end
 	end
 
-	local function finishDrag(input)
+	local function endDrag(input)
 		if dragging and (input == nil or isPressInput(input)) then
 			dragging = false
 		end
@@ -109,21 +124,19 @@ local function makeDraggable(dragHandle, targetFrame)
 
 	dragHandle.InputBegan:Connect(beginDrag)
 	dragHandle.InputChanged:Connect(updateDrag)
-	dragHandle.InputEnded:Connect(finishDrag)
+	dragHandle.InputEnded:Connect(endDrag)
 	UserInputService.InputChanged:Connect(updateDrag)
 	UserInputService.TouchMoved:Connect(updateDrag)
-	UserInputService.InputEnded:Connect(finishDrag)
-	UserInputService.TouchEnded:Connect(finishDrag)
+	UserInputService.InputEnded:Connect(endDrag)
+	UserInputService.TouchEnded:Connect(endDrag)
 
 	table.insert(activeDragSteps, function()
-		if dragging and dragStart and currentPos and startFramePos then
-			local delta = currentPos - dragStart
-			targetFrame.Position = UDim2.new(
-				startFramePos.X.Scale,
-				startFramePos.X.Offset + delta.X,
-				startFramePos.Y.Scale,
-				startFramePos.Y.Offset + delta.Y
-			)
+		if dragging and startPointer and startOffset then
+			local curPointer = UserInputService:GetMouseLocation()
+			local inset = GuiService:GetGuiInset()
+			local adjPointer = curPointer - inset
+			local delta = adjPointer - startPointer
+			targetFrame.Position = UDim2.new(0, startOffset.X + delta.X, 0, startOffset.Y + delta.Y)
 		end
 	end)
 end
