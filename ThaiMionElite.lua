@@ -38,7 +38,13 @@ if not PGui then
 	return
 end
 
-for _, name in ipairs({ "ThaiMionElite_LiquidGlass", "ThaiMionElite_BannerGui", "ThaiMionElite_TPFloatingGui", "ThaiMionElite_StatsGui" }) do
+for _, name in ipairs({
+	"ThaiMionElite_LiquidGlass",
+	"ThaiMionElite_BannerGui",
+	"ThaiMionElite_TPFloatingGui",
+	"ThaiMionElite_StatsGui",
+	"ThaiMionElite_TracerGui",
+}) do
 	local old = PGui:FindFirstChild(name)
 	if old then
 		pcall(function()
@@ -69,7 +75,7 @@ local function isPointerDown(input)
 end
 
 local function isPointerMove(input)
-	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch
+	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch
 end
 
 local function makeDraggable(dragHandle, targetFrame)
@@ -126,7 +132,6 @@ StatsGui.DisplayOrder = 45
 StatsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 StatsGui.Parent = PGui
 
--- Compact movable top bar showing FPS | CPU | Ping (appears once menu loads)
 local TopStatsBar = Instance.new("Frame")
 TopStatsBar.Name = "TopStatsBar"
 TopStatsBar.Size = UDim2.new(0, 248, 0, 26)
@@ -356,7 +361,7 @@ end
 for idx, tabName in ipairs({ "Main", "Teleport", "Lag Tool TM" }) do
 	createPage(tabName)
 	local b = createTabButton(tabName, idx)
-	b.MouseButton1Click:Connect(function()
+	b.Activated:Connect(function()
 		selectTab(tabName)
 	end)
 end
@@ -382,7 +387,7 @@ local function makeToggleRow(parent, labelPrefix, initialState, onToggle)
 	end
 	refresh()
 
-	btn.MouseButton1Click:Connect(function()
+	btn.Activated:Connect(function()
 		state = not state
 		refresh()
 		if onToggle then
@@ -432,10 +437,9 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 	titleLbl.Parent = card
 
-	-- Generous touch hit-box over the slider track so mobile fingers catch it easily
 	local hitBox = Instance.new("TextButton")
-	hitBox.Size = UDim2.new(1, -16, 0, 24)
-	hitBox.Position = UDim2.new(0, 8, 0, 21)
+	hitBox.Size = UDim2.new(1, -16, 0, 26)
+	hitBox.Position = UDim2.new(0, 8, 0, 20)
 	hitBox.BackgroundTransparency = 1
 	hitBox.Text = ""
 	hitBox.AutoButtonColor = false
@@ -564,34 +568,61 @@ local function clearAllEsp()
 	end
 end
 
--- FOV Circle + Aim Positioning Tracer Lines (inspired by green targeting lines)
-local fovCircle = Drawing and Drawing.new("Circle") or nil
-if fovCircle then
-	fovCircle.Thickness = 1.6
-	fovCircle.NumSides = 56
-	fovCircle.Filled = false
-	fovCircle.Visible = false
-	fovCircle.Color = THEME.AccentGreen
+-- GUI-based FOV Ring + Positioning Tracer Lines (works reliably across mobile executors)
+local TracerGui = Instance.new("ScreenGui")
+TracerGui.Name = "ThaiMionElite_TracerGui"
+TracerGui.ResetOnSpawn = false
+TracerGui.IgnoreGuiInset = true
+TracerGui.DisplayOrder = 30
+TracerGui.Parent = PGui
+
+local fovRingFrame = Instance.new("Frame")
+fovRingFrame.Name = "FovRing"
+fovRingFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+fovRingFrame.Size = UDim2.new(0, aimFov * 2, 0, aimFov * 2)
+fovRingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+fovRingFrame.BackgroundTransparency = 1
+fovRingFrame.Visible = false
+fovRingFrame.Parent = TracerGui
+addCorner(fovRingFrame, 999)
+addStroke(fovRingFrame, THEME.AccentGreen, 1.6, 0.15)
+
+local tracerFrames = {}
+for i = 1, 6 do
+	local bar = Instance.new("Frame")
+	bar.Name = "TracerLine_" .. tostring(i)
+	bar.AnchorPoint = Vector2.new(0.5, 0.5)
+	bar.Size = UDim2.new(0, 0, 0, 2)
+	bar.BackgroundColor3 = (i == 1) and THEME.AccentCyan or THEME.AccentGreen
+	bar.BackgroundTransparency = 0.15
+	bar.BorderSizePixel = 0
+	bar.Visible = false
+	bar.Parent = TracerGui
+	tracerFrames[i] = bar
 end
 
-local tracerLines = {}
-if Drawing then
-	for i = 1, 6 do
-		local ln = Drawing.new("Line")
-		ln.Thickness = 1.4
-		ln.Transparency = 0.88
-		ln.Visible = false
-		ln.Color = THEME.AccentGreen
-		tracerLines[i] = ln
+local function hideTracerFrames()
+	for _, bar in ipairs(tracerFrames) do
+		bar.Visible = false
 	end
 end
 
-local function hideTracerLines()
-	for _, ln in ipairs(tracerLines) do
-		ln.Visible = false
+local function drawGuiLine(bar, p1, p2)
+	local delta = p2 - p1
+	local len = delta.Magnitude
+	if len < 2 then
+		bar.Visible = false
+		return
 	end
+	local mid = (p1 + p2) * 0.5
+	local angleDeg = math.deg(math.atan2(delta.Y, delta.X))
+	bar.Position = UDim2.new(0, mid.X, 0, mid.Y)
+	bar.Size = UDim2.new(0, len, 0, 2)
+	bar.Rotation = angleDeg
+	bar.Visible = true
 end
 
+-- Floating TP TM button: teleports along screen aim center up to long distance
 local FloatingTPGui = Instance.new("ScreenGui")
 FloatingTPGui.Name = "ThaiMionElite_TPFloatingGui"
 FloatingTPGui.ResetOnSpawn = false
@@ -603,7 +634,7 @@ QuickTPBtn.Size = UDim2.new(0, 126, 0, 38)
 QuickTPBtn.Position = UDim2.new(0.75, 0, 0.72, 0)
 QuickTPBtn.BackgroundColor3 = THEME.AccentCyan
 QuickTPBtn.BackgroundTransparency = 0.2
-QuickTPBtn.Text = "TP Aim"
+QuickTPBtn.Text = "TP TM"
 QuickTPBtn.TextColor3 = THEME.TextBright
 QuickTPBtn.TextSize = 13
 QuickTPBtn.Font = Enum.Font.GothamBold
@@ -615,7 +646,7 @@ addCorner(QuickTPBtn, 10)
 addStroke(QuickTPBtn, THEME.TextBright, 1.2, 0.35)
 makeDraggable(QuickTPBtn, QuickTPBtn)
 
-local function teleportToScreenCenter()
+local function teleportAlongScreenCenter()
 	local cam = Workspace.CurrentCamera
 	if not cam then return end
 	local myChar = LocalPlayer.Character
@@ -630,12 +661,14 @@ local function teleportToScreenCenter()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { myChar }
 
-	local result = Workspace:Raycast(unitRay.Origin, unitRay.Direction * 250, params)
-	local targetPos = result and (result.Position + Vector3.new(0, 2.5, 0)) or (unitRay.Origin + unitRay.Direction * 45)
+	local farDist = 1000
+	local result = Workspace:Raycast(unitRay.Origin, unitRay.Direction * farDist, params)
+	local destPos = result and (result.Position + Vector3.new(0, 2.2, 0)) or (unitRay.Origin + unitRay.Direction * farDist)
+
 	local flatLook = Vector3.new(unitRay.Direction.X, 0, unitRay.Direction.Z)
 	local finalCFrame = (flatLook.Magnitude > 0.001)
-		and CFrame.lookAt(targetPos, targetPos + flatLook)
-		or CFrame.new(targetPos)
+		and CFrame.lookAt(destPos, destPos + flatLook)
+		or CFrame.new(destPos)
 
 	if myHum then
 		myHum.Sit = false
@@ -650,18 +683,20 @@ local function teleportToScreenCenter()
 end
 
 QuickTPBtn.Activated:Connect(function()
-	teleportToScreenCenter()
+	teleportAlongScreenCenter()
 end)
 
-local function getTargetRoot(plr)
+local function getTargetHeadOrRoot(plr)
 	if not plr or not plr.Parent then
-		return nil
+		return nil, nil
 	end
 	local char = plr.Character
 	if not char then
-		return nil
+		return nil, nil
 	end
-	return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+	local head = char:FindFirstChild("Head")
+	local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChildWhichIsA("BasePart")
+	return head, root
 end
 
 local _, setSpeed = makeToggleRow(pages.Main, "Speed", false, function(on)
@@ -697,11 +732,9 @@ setters.antiFall = setAntiFall
 
 local _, setAimHead = makeToggleRow(pages.Main, "Aim Head (FOV)", false, function(on)
 	aimHeadEnabled = on
-	if fovCircle then
-		fovCircle.Visible = on
-	end
+	fovRingFrame.Visible = on
 	if not on then
-		hideTracerLines()
+		hideTracerFrames()
 	end
 end)
 setters.aimHead = setAimHead
@@ -709,13 +742,14 @@ setters.aimHead = setAimHead
 local _, setAimTracer = makeToggleRow(pages.Main, "Aim Tracer Lines", true, function(on)
 	aimTracerEnabled = on
 	if not on then
-		hideTracerLines()
+		hideTracerFrames()
 	end
 end)
 setters.aimTracer = setAimTracer
 
 makeSliderCard(pages.Main, "Aim FOV Radius", 40, 350, aimFov, " px", function(v)
 	aimFov = v
+	fovRingFrame.Size = UDim2.new(0, aimFov * 2, 0, aimFov * 2)
 end)
 
 local _, setWallbang = makeToggleRow(pages.Main, "Wallbang", false, function(on)
@@ -753,43 +787,62 @@ local playerListLayout = Instance.new("UIListLayout")
 playerListLayout.Padding = UDim.new(0, 4)
 playerListLayout.Parent = playerListFrame
 
-local function refreshPlayerList()
-	for _, child in ipairs(playerListFrame:GetChildren()) do
-		if child:IsA("TextButton") then
-			child:Destroy()
+local playerRowButtons = {}
+
+local function updatePlayerRowVisuals()
+	for plr, row in pairs(playerRowButtons) do
+		if plr and plr.Parent and row and row.Parent then
+			local isSel = (selectedTarget == plr)
+			row.BackgroundColor3 = isSel and THEME.AccentGreen or THEME.GlassMain
+			row.BackgroundTransparency = isSel and 0.25 or 0.35
+			row.Text = (isSel and "[x] " or "[ ] ") .. plr.Name
 		end
+	end
+end
+
+local function rebuildPlayerList()
+	for plr, row in pairs(playerRowButtons) do
+		if row then
+			pcall(function() row:Destroy() end)
+		end
+		playerRowButtons[plr] = nil
 	end
 
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer then
 			local row = Instance.new("TextButton")
 			row.Size = UDim2.new(1, -6, 0, 26)
-			row.BackgroundColor3 = (selectedTarget == plr) and THEME.AccentGreen or THEME.GlassMain
-			row.BackgroundTransparency = (selectedTarget == plr) and 0.25 or 0.35
-			row.Text = ((selectedTarget == plr) and "[x] " or "[ ] ") .. plr.Name
+			row.BackgroundColor3 = THEME.GlassMain
+			row.BackgroundTransparency = 0.35
+			row.Text = "[ ] " .. plr.Name
 			row.TextColor3 = THEME.TextBright
 			row.TextSize = 11
 			row.Font = Enum.Font.GothamMedium
 			row.TextXAlignment = Enum.TextXAlignment.Left
+			row.Active = true
 			row.Parent = playerListFrame
 			addCorner(row, 6)
 
-			row.MouseButton1Click:Connect(function()
+			local function selectThisPlayer()
 				selectedTarget = plr
-				refreshPlayerList()
-			end)
+				updatePlayerRowVisuals()
+			end
+
+			row.MouseButton1Click:Connect(selectThisPlayer)
+			playerRowButtons[plr] = row
 		end
 	end
+	updatePlayerRowVisuals()
 end
 
-refreshPlayerList()
-Players.PlayerAdded:Connect(refreshPlayerList)
+rebuildPlayerList()
+Players.PlayerAdded:Connect(rebuildPlayerList)
 Players.PlayerRemoving:Connect(function(plr)
 	clearEspForPlayer(plr)
 	if selectedTarget == plr then
 		selectedTarget = nil
 	end
-	refreshPlayerList()
+	rebuildPlayerList()
 end)
 
 local _, setStickFront = makeToggleRow(pages.Teleport, "Stick Front", false, function(on)
@@ -837,11 +890,11 @@ resetBtn.Parent = pages["Lag Tool TM"]
 addCorner(resetBtn, 8)
 addStroke(resetBtn, THEME.AccentCyan, 1, 0.45)
 
-resetBtn.MouseButton1Click:Connect(function()
+resetBtn.Activated:Connect(function()
 	for _, fn in pairs(setters) do
 		fn(false)
 	end
-	hideTracerLines()
+	hideTracerFrames()
 	local char = LocalPlayer.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if hum then
@@ -886,41 +939,29 @@ local function getBestTargetInFov()
 	return bestHead, bestScreenPt
 end
 
-local function updateAimTracers(cam, center, lockedPt)
-	if not Drawing or #tracerLines == 0 then
-		return
-	end
+local function updateGuiTracers(cam, center, lockedPt)
 	if not aimHeadEnabled or not aimTracerEnabled or not lockedPt then
-		hideTracerLines()
+		hideTracerFrames()
 		return
 	end
 
-	-- Ray-style positioning lines radiating from screen center & perimeter toward locked target head
-	local topAnchor = Vector2.new(cam.ViewportSize.X * 0.5, 0)
-	local bottomAnchor = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y)
-	local leftAnchor = Vector2.new(0, cam.ViewportSize.Y * 0.5)
-	local rightAnchor = Vector2.new(cam.ViewportSize.X, cam.ViewportSize.Y * 0.5)
-	local upperLeft = Vector2.new(cam.ViewportSize.X * 0.2, 0)
-	local upperRight = Vector2.new(cam.ViewportSize.X * 0.8, 0)
-
-	local pairsList = {
-		{ center, lockedPt },
-		{ topAnchor, lockedPt },
-		{ bottomAnchor, lockedPt },
-		{ leftAnchor, lockedPt },
-		{ rightAnchor, lockedPt },
-		{ upperLeft, lockedPt },
+	local w = cam.ViewportSize.X
+	local h = cam.ViewportSize.Y
+	local anchors = {
+		center,
+		Vector2.new(w * 0.5, 0),
+		Vector2.new(w * 0.5, h),
+		Vector2.new(0, h * 0.5),
+		Vector2.new(w, h * 0.5),
+		Vector2.new(w * 0.2, 0),
 	}
 
-	for idx, ln in ipairs(tracerLines) do
-		local pair = pairsList[idx]
-		if pair then
-			ln.From = pair[1]
-			ln.To = pair[2]
-			ln.Color = (idx == 1) and THEME.AccentCyan or THEME.AccentGreen
-			ln.Visible = true
+	for idx, bar in ipairs(tracerFrames) do
+		local fromPt = anchors[idx]
+		if fromPt then
+			drawGuiLine(bar, fromPt, lockedPt)
 		else
-			ln.Visible = false
+			bar.Visible = false
 		end
 	end
 end
@@ -991,10 +1032,8 @@ local function getPingMs()
 end
 
 local function getCpuEstimatePercent(fpsNow)
-	-- Frame-time based CPU load estimate for client display
 	local frameMs = (fpsNow > 0) and (1000 / fpsNow) or 16.6
-	local pct = math.clamp(math.floor(((frameMs - 4) / 28) * 100), 5, 99)
-	return pct
+	return math.clamp(math.floor(((frameMs - 4) / 28) * 100), 5, 99)
 end
 
 RunService.Stepped:Connect(function()
@@ -1011,7 +1050,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local now = tick()
 	local char = LocalPlayer.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	local root = char and char:FindFirstChild("HumanoidRootPart")
+	local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso"))
 
 	if hum and speedEnabled and hum.WalkSpeed ~= speedValue then
 		hum.WalkSpeed = speedValue
@@ -1021,23 +1060,41 @@ RunService.Heartbeat:Connect(function(dt)
 		root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, -35, root.AssemblyLinearVelocity.Z)
 	end
 
-	if stickFrontEnabled and selectedTarget and root then
-		local tRoot = getTargetRoot(selectedTarget)
-		if tRoot then
+	-- Stick Front aligned at target's face/head level facing them
+	if stickFrontEnabled and selectedTarget and char and root then
+		local tHead, tRoot = getTargetHeadOrRoot(selectedTarget)
+		local anchorPart = tHead or tRoot
+		if anchorPart then
+			local facePos = anchorPart.Position + anchorPart.CFrame.LookVector * 3.0
+			local stickCF = CFrame.lookAt(facePos, Vector3.new(anchorPart.Position.X, facePos.Y, anchorPart.Position.Z))
+			if hum then
+				hum.Sit = false
+				hum.PlatformStand = false
+			end
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+			root.CFrame = stickCF
 			pcall(function()
-				char:PivotTo(tRoot.CFrame * CFrame.new(0, 0, -3.5))
+				char:PivotTo(stickCF)
 			end)
 		end
 	end
 
-	if flingTargetEnabled and selectedTarget and root then
-		local tRoot = getTargetRoot(selectedTarget)
+	-- Controlled Fling Target: stays near target root without wild self-spin
+	if flingTargetEnabled and selectedTarget and char and root then
+		local _, tRoot = getTargetHeadOrRoot(selectedTarget)
 		if tRoot then
+			local flingCF = tRoot.CFrame * CFrame.new(0, 0, -2)
+			root.CFrame = flingCF
 			pcall(function()
-				char:PivotTo(tRoot.CFrame)
+				char:PivotTo(flingCF)
 			end)
-			root.AssemblyAngularVelocity = Vector3.new(0, 1200, 0)
-			root.AssemblyLinearVelocity = (tRoot.Position - root.Position).Unit * 220 + Vector3.new(0, 140, 0)
+			local pushDir = (tRoot.Position - root.Position)
+			if pushDir.Magnitude < 0.2 then
+				pushDir = tRoot.CFrame.LookVector
+			end
+			root.AssemblyLinearVelocity = pushDir.Unit * 110 + Vector3.new(0, 55, 0)
+			root.AssemblyAngularVelocity = Vector3.new(0, 65, 0)
 		end
 	end
 
@@ -1119,20 +1176,18 @@ RunService.RenderStepped:Connect(function(dt)
 	local cam = Workspace.CurrentCamera
 	local center = cam and Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5) or Vector2.zero
 
-	if fovCircle and cam then
-		fovCircle.Visible = aimHeadEnabled
-		fovCircle.Radius = aimFov
-		fovCircle.Position = center
-	end
+	fovRingFrame.Visible = aimHeadEnabled
+	fovRingFrame.Size = UDim2.new(0, aimFov * 2, 0, aimFov * 2)
+	fovRingFrame.Position = UDim2.new(0, center.X, 0, center.Y)
 
 	if aimHeadEnabled and cam then
 		local head, lockedPt = getBestTargetInFov()
 		if head then
 			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, head.Position)
 		end
-		updateAimTracers(cam, center, lockedPt)
+		updateGuiTracers(cam, center, lockedPt)
 	else
-		hideTracerLines()
+		hideTracerFrames()
 	end
 
 	if espEnabled then
@@ -1186,7 +1241,7 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 local minimized = false
-MinBtn.MouseButton1Click:Connect(function()
+MinBtn.Activated:Connect(function()
 	minimized = not minimized
 	TabBar.Visible = not minimized
 	ContentArea.Visible = not minimized
@@ -1195,20 +1250,17 @@ MinBtn.MouseButton1Click:Connect(function()
 	MinBtn.Text = minimized and "+" or "-"
 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
+CloseBtn.Activated:Connect(function()
 	clearAllEsp()
-	hideTracerLines()
-	if fovCircle then
-		pcall(function() fovCircle:Remove() end)
-	end
-	for _, ln in ipairs(tracerLines) do
-		pcall(function() ln:Remove() end)
-	end
+	hideTracerFrames()
 	if FloatingTPGui then
 		pcall(function() FloatingTPGui:Destroy() end)
 	end
 	if StatsGui then
 		pcall(function() StatsGui:Destroy() end)
+	end
+	if TracerGui then
+		pcall(function() TracerGui:Destroy() end)
 	end
 	ScreenGui:Destroy()
 end)
