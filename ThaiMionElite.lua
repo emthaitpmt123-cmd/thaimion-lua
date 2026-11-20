@@ -78,50 +78,49 @@ local function isMoveInput(input)
 	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch
 end
 
-local activeDragControllers = {}
+local activeDragSteps = {}
 
 local function makeDraggable(dragHandle, targetFrame)
 	local dragging = false
-	local dragStart = nil
-	local startPos = nil
-	local currentPointerPos = nil
+	local pointerPos = nil
+	local offsetX = 0
+	local offsetY = 0
 
-	local function onStart(input)
+	local function beginDrag(input)
 		if isPressInput(input) then
 			dragging = true
-			dragStart = Vector2.new(input.Position.X, input.Position.Y)
-			currentPointerPos = dragStart
-			startPos = targetFrame.Position
+			pointerPos = Vector2.new(input.Position.X, input.Position.Y)
+			local absPos = targetFrame.AbsolutePosition
+			local parentGui = targetFrame:FindFirstAncestorOfClass("ScreenGui")
+			local insetY = (parentGui and parentGui.IgnoreGuiInset) and 0 or 36
+			offsetX = absPos.X - pointerPos.X
+			offsetY = (absPos.Y + insetY) - pointerPos.Y
 		end
 	end
 
-	local function onMove(input)
+	local function updateDrag(input)
 		if dragging and isMoveInput(input) then
-			currentPointerPos = Vector2.new(input.Position.X, input.Position.Y)
+			pointerPos = Vector2.new(input.Position.X, input.Position.Y)
 		end
 	end
 
-	local function onEnd(input)
+	local function finishDrag(input)
 		if dragging and (input == nil or isPressInput(input)) then
 			dragging = false
 		end
 	end
 
-	dragHandle.InputBegan:Connect(onStart)
-	dragHandle.InputChanged:Connect(onMove)
-	dragHandle.InputEnded:Connect(onEnd)
-	UserInputService.InputChanged:Connect(onMove)
-	UserInputService.InputEnded:Connect(onEnd)
+	dragHandle.InputBegan:Connect(beginDrag)
+	dragHandle.InputChanged:Connect(updateDrag)
+	dragHandle.InputEnded:Connect(finishDrag)
+	UserInputService.InputChanged:Connect(updateDrag)
+	UserInputService.TouchMoved:Connect(updateDrag)
+	UserInputService.InputEnded:Connect(finishDrag)
+	UserInputService.TouchEnded:Connect(finishDrag)
 
-	table.insert(activeDragControllers, function()
-		if dragging and dragStart and currentPointerPos and startPos then
-			local delta = currentPointerPos - dragStart
-			targetFrame.Position = UDim2.new(
-				startPos.X.Scale,
-				startPos.X.Offset + delta.X,
-				startPos.Y.Scale,
-				startPos.Y.Offset + delta.Y
-			)
+	table.insert(activeDragSteps, function()
+		if dragging and pointerPos then
+			targetFrame.Position = UDim2.new(0, pointerPos.X + offsetX, 0, pointerPos.Y + offsetY)
 		end
 	end)
 end
@@ -428,7 +427,7 @@ local function getParentScrollPage(inst)
 	return nil
 end
 
-local activeSliderControllers = {}
+local activeSliderSteps = {}
 
 local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, unitSuffix, onChanged)
 	local currentVal = math.clamp(defaultVal, minVal, maxVal)
@@ -453,8 +452,8 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	titleLbl.Parent = card
 
 	local hitBox = Instance.new("TextButton")
-	hitBox.Size = UDim2.new(1, -16, 0, 26)
-	hitBox.Position = UDim2.new(0, 8, 0, 20)
+	hitBox.Size = UDim2.new(1, -16, 0, 28)
+	hitBox.Position = UDim2.new(0, 8, 0, 19)
 	hitBox.BackgroundTransparency = 1
 	hitBox.Text = ""
 	hitBox.AutoButtonColor = false
@@ -477,7 +476,7 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	addCorner(fill, 4)
 
 	local knob = Instance.new("Frame")
-	knob.Size = UDim2.new(0, 15, 0, 15)
+	knob.Size = UDim2.new(0, 16, 0, 16)
 	knob.AnchorPoint = Vector2.new(0.5, 0.5)
 	knob.Position = UDim2.new(ratio, 0, 0.5, 0)
 	knob.BackgroundColor3 = THEME.TextBright
@@ -520,7 +519,6 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	local function moveSlide(input)
 		if sliding and isMoveInput(input) then
 			pointerX = input.Position.X
-			applyPosX(pointerX)
 		end
 	end
 
@@ -541,9 +539,11 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	track.InputChanged:Connect(moveSlide)
 	track.InputEnded:Connect(endSlide)
 	UserInputService.InputChanged:Connect(moveSlide)
+	UserInputService.TouchMoved:Connect(moveSlide)
 	UserInputService.InputEnded:Connect(endSlide)
+	UserInputService.TouchEnded:Connect(endSlide)
 
-	table.insert(activeSliderControllers, function()
+	table.insert(activeSliderSteps, function()
 		if sliding and pointerX then
 			applyPosX(pointerX)
 		end
@@ -588,10 +588,10 @@ local function clearAllEsp()
 	end
 end
 
+-- Clean single aim positioning line + FOV ring (no IgnoreGuiInset offset mismatch)
 local TracerGui = Instance.new("ScreenGui")
 TracerGui.Name = "ThaiMionElite_TracerGui"
 TracerGui.ResetOnSpawn = false
-TracerGui.IgnoreGuiInset = true
 TracerGui.DisplayOrder = 30
 TracerGui.Parent = PGui
 
@@ -606,39 +606,32 @@ fovRingFrame.Parent = TracerGui
 addCorner(fovRingFrame, 999)
 addStroke(fovRingFrame, THEME.AccentGreen, 1.6, 0.15)
 
-local tracerFrames = {}
-for i = 1, 6 do
-	local bar = Instance.new("Frame")
-	bar.Name = "TracerLine_" .. tostring(i)
-	bar.AnchorPoint = Vector2.new(0.5, 0.5)
-	bar.Size = UDim2.new(0, 0, 0, 2)
-	bar.BackgroundColor3 = (i == 1) and THEME.AccentCyan or THEME.AccentGreen
-	bar.BackgroundTransparency = 0.15
-	bar.BorderSizePixel = 0
-	bar.Visible = false
-	bar.Parent = TracerGui
-	tracerFrames[i] = bar
+local aimTracerBar = Instance.new("Frame")
+aimTracerBar.Name = "AimTracerLine"
+aimTracerBar.AnchorPoint = Vector2.new(0.5, 0.5)
+aimTracerBar.Size = UDim2.new(0, 0, 0, 2)
+aimTracerBar.BackgroundColor3 = THEME.AccentCyan
+aimTracerBar.BackgroundTransparency = 0.12
+aimTracerBar.BorderSizePixel = 0
+aimTracerBar.Visible = false
+aimTracerBar.Parent = TracerGui
+
+local function hideTracerLine()
+	aimTracerBar.Visible = false
 end
 
-local function hideTracerFrames()
-	for _, bar in ipairs(tracerFrames) do
-		bar.Visible = false
-	end
-end
-
-local function drawGuiLine(bar, p1, p2)
+local function drawCleanTracer(p1, p2)
 	local delta = p2 - p1
 	local len = delta.Magnitude
-	if len < 2 then
-		bar.Visible = false
+	if len < 4 then
+		aimTracerBar.Visible = false
 		return
 	end
 	local mid = (p1 + p2) * 0.5
-	local angleDeg = math.deg(math.atan2(delta.Y, delta.X))
-	bar.Position = UDim2.new(0, mid.X, 0, mid.Y)
-	bar.Size = UDim2.new(0, len, 0, 2)
-	bar.Rotation = angleDeg
-	bar.Visible = true
+	aimTracerBar.Position = UDim2.new(0, mid.X, 0, mid.Y)
+	aimTracerBar.Size = UDim2.new(0, len, 0, 2)
+	aimTracerBar.Rotation = math.deg(math.atan2(delta.Y, delta.X))
+	aimTracerBar.Visible = true
 end
 
 local FloatingTPGui = Instance.new("ScreenGui")
@@ -752,7 +745,7 @@ local _, setAimHead = makeToggleRow(pages.Main, "Aim Head (FOV)", false, functio
 	aimHeadEnabled = on
 	fovRingFrame.Visible = on
 	if not on then
-		hideTracerFrames()
+		hideTracerLine()
 	end
 end)
 setters.aimHead = setAimHead
@@ -760,7 +753,7 @@ setters.aimHead = setAimHead
 local _, setAimTracer = makeToggleRow(pages.Main, "Aim Tracer Lines", true, function(on)
 	aimTracerEnabled = on
 	if not on then
-		hideTracerFrames()
+		hideTracerLine()
 	end
 end)
 setters.aimTracer = setAimTracer
@@ -841,12 +834,10 @@ local function rebuildPlayerList()
 			row.Parent = playerListFrame
 			addCorner(row, 6)
 
-			local function selectThisPlayer()
+			row.MouseButton1Click:Connect(function()
 				selectedTarget = plr
 				updatePlayerRowVisuals()
-			end
-
-			row.MouseButton1Click:Connect(selectThisPlayer)
+			end)
 			playerRowButtons[plr] = row
 		end
 	end
@@ -912,7 +903,7 @@ resetBtn.Activated:Connect(function()
 	for _, fn in pairs(setters) do
 		fn(false)
 	end
-	hideTracerFrames()
+	hideTracerLine()
 	local char = LocalPlayer.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if hum then
@@ -955,33 +946,6 @@ local function getBestTargetInFov()
 		end
 	end
 	return bestHead, bestScreenPt
-end
-
-local function updateGuiTracers(cam, center, lockedPt)
-	if not aimHeadEnabled or not aimTracerEnabled or not lockedPt then
-		hideTracerFrames()
-		return
-	end
-
-	local w = cam.ViewportSize.X
-	local h = cam.ViewportSize.Y
-	local anchors = {
-		center,
-		Vector2.new(w * 0.5, 0),
-		Vector2.new(w * 0.5, h),
-		Vector2.new(0, h * 0.5),
-		Vector2.new(w, h * 0.5),
-		Vector2.new(w * 0.2, 0),
-	}
-
-	for idx, bar in ipairs(tracerFrames) do
-		local fromPt = anchors[idx]
-		if fromPt then
-			drawGuiLine(bar, fromPt, lockedPt)
-		else
-			bar.Visible = false
-		end
-	end
 end
 
 local cachedProps = {}
@@ -1183,11 +1147,11 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 RunService.RenderStepped:Connect(function(dt)
-	for _, dragStep in ipairs(activeDragControllers) do
-		dragStep()
+	for _, dragFn in ipairs(activeDragSteps) do
+		dragFn()
 	end
-	for _, sliderStep in ipairs(activeSliderControllers) do
-		sliderStep()
+	for _, sliderFn in ipairs(activeSliderSteps) do
+		sliderFn()
 	end
 
 	fpsCounter += 1
@@ -1213,9 +1177,13 @@ RunService.RenderStepped:Connect(function(dt)
 		if head then
 			cam.CFrame = CFrame.lookAt(cam.CFrame.Position, head.Position)
 		end
-		updateGuiTracers(cam, center, lockedPt)
+		if aimTracerEnabled and lockedPt then
+			drawCleanTracer(center, lockedPt)
+		else
+			hideTracerLine()
+		end
 	else
-		hideTracerFrames()
+		hideTracerLine()
 	end
 
 	if espEnabled then
@@ -1280,7 +1248,7 @@ end)
 
 CloseBtn.Activated:Connect(function()
 	clearAllEsp()
-	hideTracerFrames()
+	hideTracerLine()
 	if FloatingTPGui then
 		pcall(function() FloatingTPGui:Destroy() end)
 	end
