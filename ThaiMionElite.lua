@@ -80,17 +80,18 @@ local function clampPositionToScreen(target, xOffset, yOffset)
 	local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
 	local w = math.max(40, target.AbsoluteSize.X)
 	local h = math.max(24, target.AbsoluteSize.Y)
-	local maxX = math.max(6, vp.X - w - 6)
-	local maxY = math.max(6, vp.Y - h - 6)
-	local cx = math.clamp(math.floor(xOffset + 0.5), 6, maxX)
-	local cy = math.clamp(math.floor(yOffset + 0.5), 6, maxY)
-	return UDim2.new(0, cx, 0, cy)
+	local maxX = math.max(0, vp.X - math.min(w, 60))
+	local maxY = math.max(0, vp.Y - math.min(h, 36))
+	local cx = math.clamp(xOffset, 0, maxX)
+	local cy = math.clamp(yOffset, 0, maxY)
+	return UDim2.new(0, math.floor(cx + 0.5), 0, math.floor(cy + 0.5))
 end
 
 local function attachFreeDrag(handle, target, onTapCallback)
 	local activeInput = nil
 	local startPos = nil
-	local startTarget = nil
+	local baseTargetX = 0
+	local baseTargetY = 0
 	local changedConn = nil
 	local endedConn = nil
 	local dragged = false
@@ -106,7 +107,6 @@ local function attachFreeDrag(handle, target, onTapCallback)
 		end
 		activeInput = nil
 		startPos = nil
-		startTarget = nil
 	end
 
 	handle.InputBegan:Connect(function(input)
@@ -115,26 +115,31 @@ local function attachFreeDrag(handle, target, onTapCallback)
 		end
 		activeInput = input
 		startPos = Vector2.new(input.Position.X, input.Position.Y)
-		startTarget = clampPositionToScreen(target, target.AbsolutePosition.X, target.AbsolutePosition.Y)
-		target.Position = startTarget
+		if target.Position.X.Scale == 0 and target.Position.Y.Scale == 0 then
+			baseTargetX = target.Position.X.Offset
+			baseTargetY = target.Position.Y.Offset
+		else
+			baseTargetX = target.AbsolutePosition.X
+			baseTargetY = target.AbsolutePosition.Y
+		end
 		dragged = false
 
 		changedConn = input.Changed:Connect(function()
-			if input ~= activeInput or not startPos or not startTarget then
+			if input ~= activeInput or not startPos then
 				return
 			end
 			if input.UserInputState == Enum.UserInputState.Change then
 				local cur = Vector2.new(input.Position.X, input.Position.Y)
 				local dx = cur.X - startPos.X
 				local dy = cur.Y - startPos.Y
-				if math.abs(dx) > 6 or math.abs(dy) > 6 then
+				if math.abs(dx) > 4 or math.abs(dy) > 4 then
 					dragged = true
 				end
 				if dragged then
 					target.Position = clampPositionToScreen(
 						target,
-						startTarget.X.Offset + dx,
-						startTarget.Y.Offset + dy
+						baseTargetX + dx,
+						baseTargetY + dy
 					)
 				end
 			elseif input.UserInputState == Enum.UserInputState.End or input.UserInputState == Enum.UserInputState.Cancel then
