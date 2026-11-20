@@ -70,45 +70,58 @@ local function addStroke(inst, color, thickness, transparency)
 	return s
 end
 
-local function isPointerDown(input)
+local function isPressInput(input)
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
 end
 
-local function isPointerMove(input)
+local function isMoveInput(input)
 	return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch
 end
 
+local activeDragControllers = {}
+
 local function makeDraggable(dragHandle, targetFrame)
 	local dragging = false
-	local activeInput = nil
 	local dragStart = nil
 	local startPos = nil
+	local currentPointerPos = nil
 
-	dragHandle.InputBegan:Connect(function(input)
-		if isPointerDown(input) and not dragging then
+	local function onStart(input)
+		if isPressInput(input) then
 			dragging = true
-			activeInput = input
-			dragStart = input.Position
+			dragStart = Vector2.new(input.Position.X, input.Position.Y)
+			currentPointerPos = dragStart
 			startPos = targetFrame.Position
 		end
-	end)
+	end
 
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input == activeInput and isPointerMove(input) then
-			local delta = input.Position - dragStart
+	local function onMove(input)
+		if dragging and isMoveInput(input) then
+			currentPointerPos = Vector2.new(input.Position.X, input.Position.Y)
+		end
+	end
+
+	local function onEnd(input)
+		if dragging and (input == nil or isPressInput(input)) then
+			dragging = false
+		end
+	end
+
+	dragHandle.InputBegan:Connect(onStart)
+	dragHandle.InputChanged:Connect(onMove)
+	dragHandle.InputEnded:Connect(onEnd)
+	UserInputService.InputChanged:Connect(onMove)
+	UserInputService.InputEnded:Connect(onEnd)
+
+	table.insert(activeDragControllers, function()
+		if dragging and dragStart and currentPointerPos and startPos then
+			local delta = currentPointerPos - dragStart
 			targetFrame.Position = UDim2.new(
 				startPos.X.Scale,
 				startPos.X.Offset + delta.X,
 				startPos.Y.Scale,
 				startPos.Y.Offset + delta.Y
 			)
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if dragging and input == activeInput then
-			dragging = false
-			activeInput = nil
 		end
 	end)
 end
@@ -134,8 +147,8 @@ StatsGui.Parent = PGui
 
 local TopStatsBar = Instance.new("Frame")
 TopStatsBar.Name = "TopStatsBar"
-TopStatsBar.Size = UDim2.new(0, 248, 0, 26)
-TopStatsBar.Position = UDim2.new(0.5, -124, 0, 8)
+TopStatsBar.Size = UDim2.new(0, 256, 0, 26)
+TopStatsBar.Position = UDim2.new(0.5, -128, 0, 8)
 TopStatsBar.BackgroundColor3 = THEME.GlassMain
 TopStatsBar.BackgroundTransparency = 0.28
 TopStatsBar.BorderSizePixel = 0
@@ -150,7 +163,7 @@ local StatsLabel = Instance.new("TextLabel")
 StatsLabel.Size = UDim2.new(1, -12, 1, 0)
 StatsLabel.Position = UDim2.new(0, 6, 0, 0)
 StatsLabel.BackgroundTransparency = 1
-StatsLabel.Text = "FPS: 60  |  CPU: 12%  |  Ping: 35ms"
+StatsLabel.Text = "FPS: 60  |  Ping: 35ms  |  Mem: 512MB"
 StatsLabel.TextColor3 = THEME.TextBright
 StatsLabel.TextSize = 10.5
 StatsLabel.Font = Enum.Font.GothamBold
@@ -415,6 +428,8 @@ local function getParentScrollPage(inst)
 	return nil
 end
 
+local activeSliderControllers = {}
+
 local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, unitSuffix, onChanged)
 	local currentVal = math.clamp(defaultVal, minVal, maxVal)
 	local card = Instance.new("Frame")
@@ -462,16 +477,16 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	addCorner(fill, 4)
 
 	local knob = Instance.new("Frame")
-	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Size = UDim2.new(0, 15, 0, 15)
 	knob.AnchorPoint = Vector2.new(0.5, 0.5)
 	knob.Position = UDim2.new(ratio, 0, 0.5, 0)
 	knob.BackgroundColor3 = THEME.TextBright
 	knob.Parent = track
-	addCorner(knob, 7)
+	addCorner(knob, 8)
 	addStroke(knob, THEME.AccentCyan, 1.5, 0.1)
 
 	local sliding = false
-	local activeSliderInput = nil
+	local pointerX = nil
 	local parentScroll = getParentScrollPage(card)
 
 	local function applyPosX(posX)
@@ -492,20 +507,27 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	end
 
 	local function beginSlide(input)
-		if isPointerDown(input) and not sliding then
+		if isPressInput(input) then
 			sliding = true
-			activeSliderInput = input
+			pointerX = input.Position.X
 			if parentScroll then
 				parentScroll.ScrollingEnabled = false
 			end
-			applyPosX(input.Position.X)
+			applyPosX(pointerX)
+		end
+	end
+
+	local function moveSlide(input)
+		if sliding and isMoveInput(input) then
+			pointerX = input.Position.X
+			applyPosX(pointerX)
 		end
 	end
 
 	local function endSlide(input)
-		if sliding and (input == nil or input == activeSliderInput) then
+		if sliding and (input == nil or isPressInput(input)) then
 			sliding = false
-			activeSliderInput = nil
+			pointerX = nil
 			if parentScroll then
 				parentScroll.ScrollingEnabled = true
 			end
@@ -513,19 +535,17 @@ local function makeSliderCard(parent, titlePrefix, minVal, maxVal, defaultVal, u
 	end
 
 	hitBox.InputBegan:Connect(beginSlide)
+	hitBox.InputChanged:Connect(moveSlide)
+	hitBox.InputEnded:Connect(endSlide)
 	track.InputBegan:Connect(beginSlide)
+	track.InputChanged:Connect(moveSlide)
+	track.InputEnded:Connect(endSlide)
+	UserInputService.InputChanged:Connect(moveSlide)
+	UserInputService.InputEnded:Connect(endSlide)
 
-	UserInputService.InputChanged:Connect(function(input)
-		if sliding and isPointerMove(input) then
-			if activeSliderInput == nil or input == activeSliderInput or input.UserInputType == Enum.UserInputType.MouseMovement then
-				applyPosX(input.Position.X)
-			end
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if sliding and (input == activeSliderInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			endSlide(input)
+	table.insert(activeSliderControllers, function()
+		if sliding and pointerX then
+			applyPosX(pointerX)
 		end
 	end)
 end
@@ -568,7 +588,6 @@ local function clearAllEsp()
 	end
 end
 
--- GUI-based FOV Ring + Positioning Tracer Lines (works reliably across mobile executors)
 local TracerGui = Instance.new("ScreenGui")
 TracerGui.Name = "ThaiMionElite_TracerGui"
 TracerGui.ResetOnSpawn = false
@@ -622,7 +641,6 @@ local function drawGuiLine(bar, p1, p2)
 	bar.Visible = true
 end
 
--- Floating TP TM button: teleports along screen aim center up to long distance
 local FloatingTPGui = Instance.new("ScreenGui")
 FloatingTPGui.Name = "ThaiMionElite_TPFloatingGui"
 FloatingTPGui.ResetOnSpawn = false
@@ -1025,15 +1043,20 @@ local function getPingMs()
 		local net = Stats and Stats:FindFirstChild("Network")
 		local item = net and net:FindFirstChild("ServerStatsItem") and net.ServerStatsItem:FindFirstChild("Data Ping")
 		if item then
-			pingVal = math.floor(item:GetValue() + 0.5)
+			pingVal = math.max(0, math.floor(item:GetValue() + 0.5))
 		end
 	end)
 	return pingVal
 end
 
-local function getCpuEstimatePercent(fpsNow)
-	local frameMs = (fpsNow > 0) and (1000 / fpsNow) or 16.6
-	return math.clamp(math.floor(((frameMs - 4) / 28) * 100), 5, 99)
+local function getMemoryMb()
+	local memMb = 0
+	pcall(function()
+		if Stats and Stats.GetTotalMemoryUsageMb then
+			memMb = math.max(0, math.floor(Stats:GetTotalMemoryUsageMb() + 0.5))
+		end
+	end)
+	return memMb
 end
 
 RunService.Stepped:Connect(function()
@@ -1060,7 +1083,6 @@ RunService.Heartbeat:Connect(function(dt)
 		root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, -35, root.AssemblyLinearVelocity.Z)
 	end
 
-	-- Stick Front aligned at target's face/head level facing them
 	if stickFrontEnabled and selectedTarget and char and root then
 		local tHead, tRoot = getTargetHeadOrRoot(selectedTarget)
 		local anchorPart = tHead or tRoot
@@ -1080,7 +1102,6 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- Controlled Fling Target: stays near target root without wild self-spin
 	if flingTargetEnabled and selectedTarget and char and root then
 		local _, tRoot = getTargetHeadOrRoot(selectedTarget)
 		if tRoot then
@@ -1162,13 +1183,20 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 RunService.RenderStepped:Connect(function(dt)
+	for _, dragStep in ipairs(activeDragControllers) do
+		dragStep()
+	end
+	for _, sliderStep in ipairs(activeSliderControllers) do
+		sliderStep()
+	end
+
 	fpsCounter += 1
 	fpsTimer += dt
 	if fpsTimer >= 0.5 then
 		local fpsNow = math.max(1, math.floor(fpsCounter / fpsTimer + 0.5))
-		local cpuNow = getCpuEstimatePercent(fpsNow)
 		local pingNow = getPingMs()
-		StatsLabel.Text = string.format("FPS: %d  |  CPU: %d%%  |  Ping: %dms", fpsNow, cpuNow, pingNow)
+		local memNow = getMemoryMb()
+		StatsLabel.Text = string.format("FPS: %d  |  Ping: %dms  |  Mem: %dMB", fpsNow, pingNow, memNow)
 		fpsCounter = 0
 		fpsTimer = 0
 	end
